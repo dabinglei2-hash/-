@@ -1,6 +1,9 @@
 {
   "name": "个人生活管理网站",
   "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
   "forwardPorts": [8000],
   "portsAttributes": {
     "8000": {
