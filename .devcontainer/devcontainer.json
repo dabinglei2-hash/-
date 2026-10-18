@@ -1,0 +1,22 @@
+{
+  "name": "个人生活管理网站",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-bookworm",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "网站预览",
+      "onAutoForward": "notify"
+    }
+  },
+  "postStartCommand": "nohup python3 -m http.server 8000 --bind 0.0.0.0 > /tmp/personal-life-preview.log 2>&1 < /dev/null &",
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["CLOUD-DEVELOPMENT.md", "index.html"]
+    },
+    "vscode": {
+      "settings": {
+        "editor.wordWrap": "on"
+      }
+    }
+  }
+}
