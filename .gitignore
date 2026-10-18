@@ -1,0 +1,32 @@
+# Previous manual copies and local verification artifacts
+/backups/
+/work/
+/qa/
+
+# Personal data exported by this website
+我的生活管理台-v*-备份-*.json
+/personal-data/
+/data-backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Dependencies and build artifacts
+node_modules/
+dist/
+.next/
+coverage/
+*.log
+
+# Operating system temporary files
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp

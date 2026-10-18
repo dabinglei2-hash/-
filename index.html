@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F7F7F7">
+  <title>我的生活管理台</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="workspace.css">
+  <link rel="stylesheet" href="ideas.css">
+  <link rel="stylesheet" href="finance-ui.css">
+  <script src="history.js" defer></script>
+  <script src="record-editor.js" defer></script>
+  <script src="finance-categories.js" defer></script>
+  <script src="insights.js" defer></script>
+  <script src="content-tools.js" defer></script>
+  <script src="ui-icons.js" defer></script>
+  <script src="ui-system.js" defer></script>
+  <script src="finance-meta.js" defer></script>
+  <script src="finance-views.js" defer></script>
+  <script src="finance-ledger.js" defer></script>
+  <script src="ideas-ui.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="我的生活管理台首页">
+        <span class="brand-mark">生</span>
+        <span><strong>我的生活管理台</strong><small>把每一天过得更清晰</small></span>
+      </a>
+      <nav class="main-nav" aria-label="主导航">
+        <a class="nav-link active" href="#overview"><span class="nav-icon" aria-hidden="true"><span data-icon="home"></span></span>首页</a>
+        <a class="nav-link" href="#records"><span class="nav-icon" aria-hidden="true"><span data-icon="record"></span></span>记录</a>
+        <a class="nav-link" href="#finance"><span class="nav-icon" aria-hidden="true"><span data-icon="finance"></span></span>收支</a>
+        <a class="nav-link" href="#monthly"><span class="nav-icon" aria-hidden="true"><span data-icon="stats"></span></span>统计</a>
+        <a class="nav-link" href="#personal"><span class="nav-icon" aria-hidden="true"><span data-icon="profile"></span></span>我的</a>
+      </nav>
+      <div class="sidebar-note"><span class="note-dot"></span><span>你的记录保存在这台设备的浏览器中。</span></div>
+      <div class="sidebar-footer">个人空间 <span>·</span> 本地保存</div>
+    </aside>
+
+    <nav class="mobile-bottom-nav" aria-label="手机底部导航">
+      <a class="mobile-bottom-link nav-link active" href="#overview"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="home"></span></span><span>首页</span></a>
+      <a class="mobile-bottom-link nav-link" href="#records"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="record"></span></span><span>记录</span></a>
+      <a class="mobile-bottom-link nav-link" href="#finance"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="finance"></span></span><span>收支</span></a>
+      <a class="mobile-bottom-link nav-link" href="#monthly"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="stats"></span></span><span>统计</span></a>
+      <a class="mobile-bottom-link nav-link" href="#personal"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="profile"></span></span><span>我的</span></a>
+    </nav>
+
+    <main class="main-content">
+      <p id="app-status" class="app-status hidden" role="alert"></p>
+      <p id="app-toast" class="app-toast hidden" role="status" aria-live="polite"></p>
+      <div class="date-control-parking hidden" id="date-control-parking"><label class="date-control"><span>查看日期</span><input id="selected-date" type="date" aria-label="选择查看日期"></label></div>
+
+      <section class="page-section" id="overview-section">
+        <header class="home-header">
+          <button class="square-button" id="home-date-open" type="button" aria-label="选择首页日期" aria-haspopup="dialog"><span data-icon="calendar"></span></button>
+          <a class="home-profile" href="#personal" data-open-page aria-label="打开我的个人资料"><span class="home-avatar" id="home-avatar">我</span><span id="home-nickname" class="sr-only">我的生活</span></a>
+          <a class="square-button" href="#search" data-open-page aria-label="全站搜索"><span data-icon="search"></span></a>
+        </header>
+        <div class="home-heading"><h1 class="sr-only">首页</h1><p id="home-scope-label"></p></div>
+        <p class="daily-save-toast hidden" id="daily-save-toast" role="status" aria-live="polite"></p>
+        <nav class="home-cards" aria-label="所选日期的生活摘要">
+          <a class="home-card" href="#learning" data-home-card="study"><span class="home-card-title">学习 </span><span class="home-main-value"><strong id="overview-study">0</strong><small>分钟</small></span><span class="home-card-sub" id="overview-study-sub"></span></a>
+          <a class="home-card" href="#daily-notes" data-home-card="note"><span class="home-card-title">妙想 </span><span class="home-main-value"><strong id="overview-notes">0</strong><small>条</small></span><span class="home-card-sub note-card-preview" id="overview-note-preview"></span></a>
+          <a class="home-card home-money" href="#finance" data-home-card="finance"><span class="home-card-title">收支 </span><span class="home-money-pair"><span><small>支出 · USD</small><strong id="overview-expense">—</strong></span><span><small>收入 · USD</small><strong id="overview-income">—</strong></span></span><span class="home-balance"><small>差额</small><strong id="overview-balance">—</strong></span></a>
+          <a class="home-card" href="#tasks" data-home-card="task"><span class="home-card-title">任务 </span><span class="home-main-value"><strong id="task-fraction">0 / 0</strong><small>已完成</small></span><span class="home-task-line"><span id="progress-title"></span><strong id="completion-percent">0%</strong></span><span class="task-progress-track"><span id="task-progress-bar"></span></span></a>
+        </nav>
+        <a class="today-record-fab" href="#today-record" data-quick-launch aria-label="快速记录今天" title="快速记录今天" aria-haspopup="dialog" aria-expanded="false"><span data-icon="edit"></span></a>
+      </section>
+      <dialog id="home-date-dialog" class="editor-dialog calendar-dialog" aria-labelledby="home-date-title"><h2 id="home-date-title">查看日期</h2><div id="overview-date-slot"></div><div class="form-row"><button id="home-date-today" class="secondary-button" type="button">返回今天</button><button id="home-date-close" class="primary-button" type="button">查看这一天</button></div></dialog>
+      <dialog id="quick-record-sheet" class="quick-record-sheet" aria-labelledby="quick-record-heading">
+        <div class="quick-sheet-grabber" aria-hidden="true"></div>
+        <header class="quick-sheet-header"><div><p class="eyebrow">快速记录</p><h2 id="quick-record-heading">今天</h2><p id="quick-record-date" class="quick-sheet-date"></p></div><button class="quick-sheet-close" id="quick-record-close" type="button" aria-label="关闭快速记录"><span data-icon="close"></span></button></header>
+        <div id="quick-record-choices" class="quick-record-choices" aria-label="选择记录类型">
+          <button type="button" data-quick-kind="study"><span class="quick-choice-icon" data-icon="study"></span><span><strong>学习</strong><small>内容与时长</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
+          <button type="button" data-quick-kind="finance"><span class="quick-choice-icon" data-icon="finance"></span><span><strong>收入 / 支出</strong><small>金额、分类与备注</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
+          <button type="button" data-quick-kind="task"><span class="quick-choice-icon" data-icon="task"></span><span><strong>任务</strong><small>添加一项工作计划</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
+        </div>
+        <form id="quick-record-form" class="quick-record-form hidden" novalidate>
+          <button class="quick-sheet-back" id="quick-record-back" type="button"><span aria-hidden="true"><span data-icon="back"></span></span> 记录类型</button>
+          <section id="quick-study-fields" class="quick-sheet-fields hidden" aria-label="学习记录">
+            <label>学习内容<input id="quick-study-content" type="text" maxlength="100" placeholder="例如：阅读英语文章" autocomplete="off"></label>
+            <label>学习时间 <span class="label-hint">分钟</span><input id="quick-study-duration" type="number" min="1" max="1440" step="1" inputmode="numeric" placeholder="45"></label>
+          </section>
+          <section id="quick-finance-fields" class="quick-sheet-fields hidden" aria-label="收入或支出">
+            <fieldset class="bill-type segmented quick-finance-type"><legend class="sr-only">流水类型</legend><label><input type="radio" name="quick-finance-type" value="income" checked><span>收入</span></label><label><input type="radio" name="quick-finance-type" value="expense"><span>支出</span></label></fieldset>
+            <label>金额 <span class="label-hint">USD</span><input id="quick-finance-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+            <label>分类<select id="quick-finance-category"></select></label>
+            <label>备注 <span class="label-hint">可选</span><input id="quick-finance-note" type="text" maxlength="120" placeholder="这笔收支的用途" autocomplete="off"></label>
+          </section>
+          <section id="quick-task-fields" class="quick-sheet-fields hidden" aria-label="工作任务">
+            <label>任务内容<input id="quick-task-content" type="text" maxlength="120" placeholder="添加一项今天要做的事" autocomplete="off"></label>
+            <label class="quick-task-completed"><input id="quick-task-completed" type="checkbox"><span>创建后标记为已完成</span></label>
+          </section>
+          <p id="quick-record-status" class="quick-record-status" role="status" aria-live="polite"></p>
+          <button class="primary-button quick-record-submit" id="quick-record-submit" type="submit">保存</button>
+        </form>
+      </dialog>
+
+      <section class="page-section" id="records-section">
+        <div class="section-heading"><div><h2 class="sr-only">记录</h2></div></div>
+        <nav class="record-hub-links" aria-label="记录中心页面">
+          <a href="#daily-notes"><span>妙想</span><small>记录每天的想法</small><b aria-hidden="true"><span data-icon="chevronRight"></span></b></a>
+          <a href="#habits"><span>习惯</span><small>查看完成情况</small><b aria-hidden="true"><span data-icon="chevronRight"></span></b></a>
+          <a href="#goals"><span>长期目标</span><small>查看时间线与进度</small><b aria-hidden="true"><span data-icon="chevronRight"></span></b></a>
+        </nav>
+        <nav class="record-secondary-links" aria-label="更多记录页面"><a href="#learning"><span>学习详情</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#tasks"><span>工作计划</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#today-record" data-open-page><span>完整今日回顾</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a></nav>
+      </section>
+      <section class="page-section" id="daily-notes-section"><div class="section-heading"><div><h2>妙想</h2><p class="page-description">留下每天值得记住的事情。</p></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="daily-notes-slot"></div><article class="panel note-detail hidden" id="note-detail" aria-live="polite"></article></section>
+      <section class="page-section" id="habits-section"><div class="section-heading"><div><h2>习惯打卡</h2></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="habits-slot"></div></section>
+      <section class="page-section" id="goals-section"><div class="section-heading"><div><h2>长期目标</h2></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="goals-slot"></div><article class="panel goal-detail hidden" id="goal-detail" aria-live="polite"></article></section>
+
+      <section class="page-section" id="today-record">
+        <div class="record-page-heading"><div><button class="record-return" id="daily-record-back" type="button"><span data-icon="back"></span> 返回</button><p class="eyebrow">每天几分钟</p><h2>记录今天</h2></div><nav class="record-shortcuts" aria-label="记录相关页面"><a href="#learning">学习详情 <span data-icon="chevronRight"></span></a><a href="#tasks">工作计划 <span data-icon="chevronRight"></span></a></nav></div>
+        <article class="panel daily-record-panel">
+          <form id="daily-record-form" class="daily-record-form">
+            <div class="daily-core-grid">
+              <label>日期<input id="daily-record-date" type="date" required></label>
+              <label>学习时长 <span class="label-hint">分钟</span><input id="daily-study-minutes" type="number" min="0" max="1440" step="1" inputmode="numeric" placeholder="分钟"></label>
+              <label>外卖收入 <span class="label-hint">USD</span><input id="daily-income" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填写"></label>
+              <label>日常支出 <span class="label-hint">USD</span><input id="daily-expense" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填写"></label>
+            </div>
+            <label class="daily-wide">今日完成事项<textarea id="daily-completed-items" rows="2" maxlength="1000" placeholder="今天完成了什么？"></textarea></label>
+            <fieldset class="energy-field daily-wide"><legend>精力状态</legend><div class="energy-options">
+              <label><input type="radio" name="daily-energy" value="充沛"><span>充沛</span></label>
+              <label><input type="radio" name="daily-energy" value="不错"><span>不错</span></label>
+              <label><input type="radio" name="daily-energy" value="一般"><span>一般</span></label>
+              <label><input type="radio" name="daily-energy" value="疲惫"><span>疲惫</span></label>
+            </div></fieldset>
+            <details class="daily-summary-details daily-wide"><summary>今日总结 <span>可选</span></summary><label class="sr-only" for="daily-summary">今日总结</label><textarea id="daily-summary" rows="2" maxlength="1200" placeholder="今天最想记住的一件事"></textarea></details>
+            <div class="daily-record-footer daily-wide"><span>编辑日报会同步更新原有学习与收支统计。</span><button class="primary-button" id="daily-record-submit" type="submit">保存今天 <span><span data-icon="check"></span></span></button></div>
+          </form>
+          <p class="daily-record-status" id="daily-record-status" role="status" aria-live="polite"></p>
+        </article>
+      </section>
+
+      <section class="page-section" id="personal">
+        <div class="section-heading personal-heading"><div><h2 class="sr-only">我的</h2></div></div>
+        <div class="personal-data-status" id="personal-data-status" role="status" aria-live="polite"></div>
+        <nav class="personal-shortcuts ui-group-card" aria-label="设置与数据管理"><a class="settings-row ui-group-row" href="#settings" data-open-page><span class="ui-row-icon" data-icon="profile"></span><span class="ui-row-copy"><strong>个人资料与偏好</strong><small>管理个人信息与现有设置</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#backup" data-open-page><span class="ui-row-icon" data-icon="export"></span><span class="ui-row-copy"><strong>数据备份</strong><small>导出、检查与安全恢复</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a></nav>
+
+        <dialog class="panel personal-settings" id="personal-settings" aria-labelledby="personal-settings-title">
+          <div class="panel-heading"><div><h3 id="personal-settings-title">个人设置</h3><p>更新个人资料和财富目标</p></div></div>
+          <form class="form-stack personal-settings-form" id="personal-settings-form">
+            <div class="form-row"><label>昵称<input id="profile-nickname-input" type="text" maxlength="40" placeholder="填写你希望显示的昵称"></label><label>身份<input id="profile-identity-input" type="text" maxlength="60" placeholder="例如：自由职业者、学生"></label></div>
+            <label>个人目标<input id="profile-goal-input" type="text" maxlength="120" placeholder="例如：建立稳定的学习和储蓄习惯"></label>
+            <label>座右铭<input id="profile-motto-input" type="text" maxlength="160" placeholder="写下一句提醒自己的话"></label>
+            <label>财富目标 <span class="label-hint">USD</span><input id="wealth-target-input" type="number" min="0.01" step="0.01" placeholder="例如：10000"></label>
+            <div class="form-row"><button class="primary-button" type="submit">保存设置</button><button class="secondary-button" id="personal-settings-cancel" type="button">取消修改</button></div>
+          </form>
+        </dialog>
+
+        <article class="panel profile-card">
+          <div class="profile-avatar-wrap"><div class="profile-avatar" id="profile-avatar">我</div><button class="ui-icon-button personal-settings-toggle" id="personal-settings-toggle" type="button" aria-label="编辑个人资料" aria-haspopup="dialog"><span data-icon="edit"></span></button></div>
+          <div class="profile-main"><p class="eyebrow">我的名片</p><div class="profile-name-row"><h3 id="profile-nickname">我的昵称</h3></div><span class="profile-identity" id="profile-identity">添加你的身份介绍</span><p class="profile-goal hidden"><strong>正在努力</strong><span id="profile-goal">设置一个属于自己的目标</span></p></div>
+          <blockquote id="profile-motto">写下你的座右铭，让它陪伴每一天。</blockquote>
+        </article>
+
+        <div class="personal-growth-grid ui-group-card" role="group" aria-label="成长与进度">
+          <article class="panel growth-panel"><div class="panel-heading"><div><p class="eyebrow">日积月累</p><h3>成长数据</h3></div><span class="soft-badge">学习记录</span></div>
+            <div class="growth-metrics"><div><strong id="personal-study-minutes">0</strong><span>学习总分钟</span></div><div><strong id="personal-study-days">0</strong><span>学习天数</span></div><div><strong id="personal-study-streak">0</strong><span>连续学习天数</span></div></div>
+          </article>
+          <article class="panel wealth-panel"><div class="panel-heading"><div><p class="eyebrow">稳步积累</p><h3>财富成长</h3></div><span class="soft-badge">美元 USD</span></div>
+            <div class="wealth-metrics"><div><span>累计收入</span><strong class="money-in" id="personal-income">$0.00</strong></div><div><span>累计支出</span><strong class="money-out" id="personal-expense">$0.00</strong></div><div><span>净积累</span><strong id="personal-net-worth">$0.00</strong></div></div>
+            <div class="wealth-progress-copy"><span id="wealth-progress-label">请在个人设置中填写财富目标</span><strong id="wealth-progress-percent">0%</strong></div><div class="wealth-progress-track"><span id="wealth-progress-bar"></span></div>
+          </article>
+        </div>
+
+        <details class="skills-details">
+          <summary class="ui-group-row"><span class="ui-row-icon" data-icon="skills"></span><span class="ui-row-copy"><strong>技能进度</strong><small>学习与技能提升</small></span><small class="ui-row-meta" id="my-skills-meta"></small><span class="ui-disclosure-icon" aria-hidden="true"><span data-icon="chevronRight"></span></span></summary>
+          <article class="panel skills-panel"><div class="panel-heading"><div><h3>持续成长</h3><p>更新各项技能的自我评估。</p></div></div><div class="skills-tree" id="personal-skills"></div></article>
+        </details>
+
+        <div class="personal-columns">
+          <article class="panel diary-panel"><div class="panel-heading"><div><p class="eyebrow">留住此刻</p><h3>妙想</h3><p>写下当天值得记住的事情。</p></div><span class="soft-badge" id="diary-count">0 篇</span></div>
+            <form id="diary-form" class="form-stack diary-form"><label>标题（可选）<input id="diary-title-input" type="text" maxlength="80" placeholder="给今天起个标题"></label><label>妙想内容<textarea id="diary-content-input" rows="4" maxlength="3000" placeholder="今天发生了什么？有什么新的想法？" required></textarea></label><button class="primary-button full-button" type="submit">保存妙想 <span><span data-icon="add"></span></span></button></form>
+            <div class="diary-list" id="diary-list"></div><div class="empty-state" id="diary-empty"><span data-icon="empty"></span><strong>这一天还没有妙想</strong><p>写几句话，记录今天的自己。</p></div>
+          </article>
+
+          <article class="panel habits-panel"><div class="panel-heading"><div><p class="eyebrow">小习惯，大改变</p><h3>习惯打卡</h3><p id="habit-progress">今天完成 0 / 0 项</p></div><label class="personal-date-control">打卡日期<input id="personal-date" type="date" aria-label="选择习惯打卡日期"></label></div>
+            <form id="habit-form" class="inline-add-form"><input id="habit-name-input" aria-label="新习惯名称" type="text" maxlength="50" placeholder="添加一个习惯" required><button class="primary-button" type="submit" aria-label="添加习惯"><span data-icon="add"></span></button></form>
+            <div class="habit-list" id="habit-list"></div><div class="empty-state" id="habit-empty"><span><span data-icon="check"></span></span><strong>添加想坚持的习惯</strong><p>每天完成后勾选打卡。</p></div>
+          </article>
+        </div>
+
+        <article class="panel goals-panel" id="goals"><div class="panel-heading"><div><p class="eyebrow">看见更远的自己</p><h3>长期目标时间线</h3><p>为重要目标设定日期，持续向前。</p></div><span class="soft-badge" id="goal-count">0 个目标</span></div>
+          <form id="goal-form" class="goal-form"><label>目标名称<input id="goal-title-input" type="text" maxlength="120" placeholder="例如：完成个人网站第一版" required></label><label>目标日期<input id="goal-date-input" type="date" required></label><label class="goal-description-field">备注<input id="goal-description-input" type="text" maxlength="180" placeholder="写下目标的下一步"></label><button class="primary-button" type="submit">添加目标 <span><span data-icon="add"></span></span></button></form>
+          <div class="goal-timeline" id="goal-timeline"></div><div class="empty-state" id="goal-empty"><span data-icon="empty"></span><strong>还没有长期目标</strong><p>添加一个目标，为未来留下一条清晰的路径。</p></div>
+        </article>
+      </section>
+
+      <section class="page-section" id="learning">
+        <div class="section-heading"><div><p class="eyebrow">持续积累</p><h2>每日学习时间</h2><p class="page-description">记录学习内容和时长，看看每天的投入。</p></div><div class="section-total"><span>所选日期总时长</span><strong id="study-total">0 分钟</strong></div></div>
+        <div class="content-grid">
+          <article class="panel form-panel"><div class="panel-heading"><div><h3 id="study-form-title">添加学习记录</h3><p id="study-form-description">每次学习都可以单独记一条</p></div></div>
+            <form id="study-form" class="form-stack">
+              <label>日期<input id="study-date" type="date" required></label>
+              <label>学习内容<input id="study-content" type="text" maxlength="100" placeholder="例如：阅读英语文章" required></label>
+              <label>学习时长 <span class="label-hint">分钟</span><input id="study-duration" type="number" min="1" max="1440" step="1" placeholder="例如：45" required></label>
+              <div class="record-form-actions"><button class="primary-button full-button" id="study-submit" type="submit">添加学习记录 <span><span data-icon="add"></span></span></button><button class="secondary-button hidden" id="study-edit-cancel" type="button">取消编辑</button></div>
+              <p class="record-form-status" id="study-form-status" role="status" aria-live="polite"></p>
+            </form>
+          </article>
+          <article class="panel table-panel"><div class="panel-heading"><div><h3>学习历史</h3><p>按日期和关键词查找，每页 10 条</p></div><span class="soft-badge" id="study-count">0 条记录</span></div>
+            <div class="history-controls" role="group" aria-label="学习历史筛选">
+              <div class="history-filter-row">
+                <label>日期范围<select id="study-history-range"><option value="selected">所选日</option><option value="week">截至所选日的近 7 天</option><option value="month">所选月</option><option value="all">全部日期</option><option value="custom">自定义日期</option></select></label>
+                <label class="history-search">关键词<input id="study-history-search" type="search" placeholder="搜索学习内容" maxlength="120" autocomplete="off"></label>
+              </div>
+              <div class="history-date-row hidden" id="study-history-dates"><label>开始日期<input id="study-history-start" type="date"></label><label>结束日期<input id="study-history-end" type="date"></label></div>
+              <div class="history-filter-note"><span>所选日以页面顶部日期为准</span><button class="history-reset" id="study-history-reset" type="button">重置筛选</button></div>
+            </div>
+            <p class="history-summary" id="study-history-summary" role="status" aria-live="polite"></p>
+            <div class="table-wrap"><table><thead><tr><th>学习内容</th><th>时长</th><th>操作</th></tr></thead><tbody id="study-table"></tbody></table><div class="empty-state" id="study-empty"><span data-icon="empty"></span><strong>没有符合条件的学习记录</strong><p>可以调整日期范围、清空关键词，或添加一条新记录。</p></div></div>
+            <nav class="history-pagination" aria-label="学习历史分页"><button class="secondary-button" id="study-history-prev" type="button">上一页</button><span id="study-history-page">暂无记录</span><button class="secondary-button" id="study-history-next" type="button">下一页</button></nav>
+          </article>
+        </div>
+      </section>
+
+      <section class="page-section" id="finance">
+        <header class="finance-topbar"><h2 class="sr-only">收支</h2><a class="finance-profile" href="#personal" data-open-page aria-label="打开我的个人资料"><span class="home-avatar" id="finance-avatar">我</span></a></header>
+        <section class="ui-content-card finance-overview-card" aria-label="本期收支">
+          <button class="text-button" id="finance-month-open" type="button" aria-haspopup="dialog"><span id="finance-month-label"></span><span data-icon="chevronDown"></span></button>
+          <div class="period-summary"><a href="#finance/income" data-finance-view="income" data-open-page><span>收入 · USD</span><strong id="finance-income">—</strong></a><a href="#finance/expense" data-finance-view="expense" data-open-page><span>支出 · USD</span><strong id="finance-expense">—</strong></a></div>
+        </section>
+        <nav class="finance-tools" aria-label="财务管理"><a href="#finance/bills" data-finance-view="bills" data-open-page><span data-icon="record"></span><span>账单</span></a><a href="#finance/budget" data-finance-view="budget" data-open-page><span data-icon="wallet"></span><span>预算</span></a><a href="#finance/assets" data-finance-view="assets" data-open-page><span data-icon="savings"></span><span>资产管家</span></a><span class="finance-unavailable" aria-label="购物返现：当前未提供"><span data-icon="shopping"></span><span>购物返现</span><small>未提供</small></span><button type="button" id="finance-more-open" aria-haspopup="dialog"><span data-icon="more"></span><span>更多</span></button></nav>
+        <dialog class="editor-dialog ui-sheet" id="finance-more-dialog" aria-labelledby="finance-more-title"><div class="ui-sheet-header"><h2 id="finance-more-title">更多收支工具</h2><button class="ui-icon-button" type="button" id="finance-more-close" aria-label="关闭更多收支工具"><span data-icon="close"></span></button></div><div id="finance-search-slot"></div><div class="finance-more-balance"><span>所选月结余</span><strong id="finance-balance">—</strong><p id="finance-period-caption" class="subtle-copy"></p></div><div class="settings-list"><button class="settings-row" id="finance-filters-open" type="button" aria-haspopup="dialog"><span>筛选账单日期与范围</span><span data-icon="calendar"></span></button><a class="settings-row" href="#categories" data-open-page><span>分类管理</span><span data-icon="chevronRight"></span></a></div></dialog>
+        <a class="finance-entry-fab" href="#bill/new" data-open-page aria-label="新增一笔收支"><span data-icon="add"></span></a>
+        <section class="category-overview"><div class="panel-heading"><h3>分类概览</h3><label class="sr-only" for="finance-category-type">分类方向</label><select id="finance-category-type"><option value="expense">支出</option><option value="income">收入</option></select></div><div id="finance-category-list" class="rank-list"></div></section>
+        <div class="content-grid">
+          <article class="panel form-panel"><div class="panel-heading"><div><h3 id="finance-form-title">新增一笔收支</h3><p id="finance-form-description">独立流水，与今日回顾分开保存</p></div></div>
+            <form id="finance-form" class="form-stack">
+              <label>日期<input id="finance-date" type="date" required></label>
+              <div class="finance-quick-actions"><button class="secondary-button" type="button" data-focus-finance="income"><span data-icon="add"></span> 添加收入</button><button class="secondary-button" type="button" data-focus-finance="expense"><span data-icon="add"></span> 添加支出</button></div>
+              <div class="form-row"><label>收入 <span class="label-hint">USD</span><input id="finance-income-input" type="number" min="0" step="0.01" placeholder="0.00"></label><label>支出 <span class="label-hint">USD</span><input id="finance-expense-input" type="number" min="0" step="0.01" placeholder="0.00"></label></div>
+              <label>备注<input id="finance-note" type="text" maxlength="120" placeholder="例如：晚餐、外卖配送收入"></label>
+              <div class="record-form-actions"><button class="primary-button full-button" id="finance-submit" type="submit">新增收支流水 <span><span data-icon="add"></span></span></button><button class="secondary-button hidden" id="finance-edit-cancel" type="button">取消编辑</button></div>
+              <p class="record-form-status" id="finance-form-status" role="status" aria-live="polite"></p>
+            </form>
+          </article>
+          <article class="panel table-panel"><div class="panel-heading"><div><h3>账单列表</h3><p>按日期和关键词查找，每页 10 条</p></div><span class="soft-badge" id="finance-count">0 条记录</span></div>
+            <div class="history-controls" role="group" aria-label="收支历史筛选">
+              <div class="history-filter-row">
+                <label>日期范围<select id="finance-history-range"><option value="selected">所选日</option><option value="week">截至所选日的近 7 天</option><option value="month">所选月</option><option value="all">全部日期</option><option value="custom">自定义日期</option></select></label>
+                <label class="history-search">关键词<input id="finance-history-search" type="search" placeholder="搜索收支备注" maxlength="120" autocomplete="off"></label>
+              </div>
+              <div class="history-date-row hidden" id="finance-history-dates"><label>开始日期<input id="finance-history-start" type="date"></label><label>结束日期<input id="finance-history-end" type="date"></label></div>
+              <div class="history-filter-note"><span>所选日以页面顶部日期为准</span><button class="history-reset" id="finance-history-reset" type="button">重置筛选</button></div>
+            </div>
+            <p class="history-summary" id="finance-history-summary" role="status" aria-live="polite"></p>
+            <div class="table-wrap"><table><thead><tr><th>日期与备注</th><th>收入</th><th>支出</th><th>操作</th></tr></thead><tbody id="finance-table"></tbody></table><div class="empty-state" id="finance-empty"><span data-icon="empty"></span><strong>没有符合条件的收支记录</strong><p>可以调整日期范围、清空关键词，或添加一条新记录。</p></div></div>
+            <nav class="history-pagination" aria-label="收支历史分页"><button class="secondary-button" id="finance-history-prev" type="button">上一页</button><span id="finance-history-page">暂无记录</span><button class="secondary-button" id="finance-history-next" type="button">下一页</button></nav>
+          </article>
+        </div>
+      </section>
+
+      <section class="page-section" id="work-plan-section">
+        <div id="task-list-view">
+          <form class="quick-task-form" id="quick-task-form"><label class="sr-only" for="quick-task-title">快速添加任务</label><input id="quick-task-title" type="text" maxlength="120" placeholder="添加当天任务" required><button class="secondary-button" type="submit">添加任务</button></form>
+          <div class="section-heading"><div><p class="eyebrow">安排好每一步</p><h2>今日工作计划</h2><p class="page-description">添加任务、安排时间，并在完成后勾选。</p></div><div class="section-total"><span>所选日期完成情况</span><strong id="task-total">0 / 0 项</strong></div></div>
+          <div class="content-grid tasks-grid">
+            <article class="panel form-panel"><div class="panel-heading"><div><h3 id="task-form-title">添加工作任务</h3><p>可以设置计划开始和结束时间</p></div></div>
+              <form id="task-form" class="form-stack">
+                <input id="task-id" type="hidden">
+                <label>日期<input id="task-date" type="date" required></label>
+                <label>任务内容<input id="task-title" type="text" maxlength="120" placeholder="例如：整理本周工作安排" required></label>
+                <div class="form-row"><label>开始时间<input id="task-start" type="time"></label><label>结束时间<input id="task-end" type="time"></label></div>
+                <div class="form-actions"><button class="primary-button full-button" id="task-submit" type="submit">添加任务 <span><span data-icon="add"></span></span></button><button class="secondary-button full-button hidden" id="task-cancel" type="button">取消编辑</button></div>
+              </form>
+            </article>
+            <article class="panel table-panel task-panel"><div class="panel-heading"><div><h3>任务清单</h3><p>完成一项，就勾选一项</p></div><span class="soft-badge" id="task-badge">0 项任务</span></div>
+              <div id="task-list" class="task-list"></div><div class="empty-state" id="task-empty"><span><span data-icon="check"></span></span><strong>今天还没有任务</strong><p>写下接下来要做的事，让计划更清晰。</p></div>
+            </article>
+          </div>
+        </div>
+        <div id="task-detail-view" class="task-detail-view hidden" aria-labelledby="task-detail-title">
+          <div class="task-detail-toolbar">
+            <button class="task-back-button" id="task-detail-back" type="button" aria-label="返回上一页"><span aria-hidden="true"><span data-icon="back"></span></span><span>返回</span></button>
+            <div class="task-stepper" aria-label="任务切换">
+              <button class="task-step-button" id="task-previous" type="button"><span data-icon="back"></span> 上一个</button>
+              <span id="task-sequence" aria-live="polite">— / —</span>
+              <button class="task-step-button" id="task-next" type="button">下一个 <span data-icon="chevronRight"></span></button>
+            </div>
+          </div>
+          <article class="task-detail-content">
+            <p class="task-detail-date" id="task-detail-date"></p>
+            <h2 id="task-detail-title">任务详情</h2>
+            <div class="task-detail-meta"><span id="task-detail-time"></span><span id="task-detail-status"></span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page-section" id="monthly">
+        <div class="section-heading monthly-heading"><div><p class="eyebrow">回顾与总结</p><h2>月度统计</h2><p class="page-description">按记录日期汇总学习、收支和工作任务。</p></div>
+          <div class="month-controls"><label>年份<select id="month-year" aria-label="选择统计年份"></select></label><label>月份<select id="month-month" aria-label="选择统计月份">
+            <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option><option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option><option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option><option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+          </select></label></div>
+        </div>
+        <div class="monthly-stats-grid">
+          <article class="stat-card accent-green"><div class="stat-top"><span>月总收入</span><span class="stat-icon" aria-hidden="true"><span data-icon="task"></span></span></div><div class="stat-value"><strong id="month-income">$0.00</strong></div><p>美元 USD</p></article>
+          <article class="stat-card accent-orange"><div class="stat-top"><span>月总支出</span><span class="stat-icon" aria-hidden="true"><span data-icon="task"></span></span></div><div class="stat-value"><strong id="month-expense">$0.00</strong></div><p>美元 USD</p></article>
+          <article class="stat-card accent-purple"><div class="stat-top"><span>月收支差额</span><span class="stat-icon" aria-hidden="true"><span data-icon="task"></span></span></div><div class="stat-value"><strong id="month-balance">$0.00</strong></div><p>总收入减总支出</p></article>
+          <article class="stat-card accent-blue"><div class="stat-top"><span>整月学习时长</span><span class="stat-icon" aria-hidden="true"><span data-icon="profile"></span></span></div><div class="stat-value"><strong id="month-study">0</strong><span>分钟</span></div><p id="month-study-days">0 个学习日</p></article>
+          <article class="stat-card accent-purple"><div class="stat-top"><span>任务完成情况</span><span class="stat-icon" aria-hidden="true"><span data-icon="task"></span></span></div><div class="stat-value"><strong id="month-tasks">0 / 0</strong></div><p id="month-task-rate">完成率 0%</p></article>
+        </div>
+        <article class="panel monthly-detail-panel">
+          <div class="panel-heading"><div><h3>每日明细</h3><p id="month-detail-caption">逐日查看学习时长、收入和支出</p></div><div class="month-highlights"><span id="month-high-income">收入最高：暂无记录</span><span id="month-high-expense">支出最多：暂无记录</span></div></div>
+          <div class="table-wrap monthly-table-wrap"><table class="monthly-table"><thead><tr><th>日期</th><th>学习时长</th><th>收入（USD）</th><th>支出（USD）</th><th>收支差额（USD）</th></tr></thead><tbody id="month-daily-table"></tbody></table><div class="empty-state hidden" id="month-empty"><span data-icon="empty"></span><strong>这个月还没有记录</strong><p>添加学习、收支或任务记录后，这里会自动汇总。</p></div></div>
+        </article>
+      </section>
+      <section class="page-section" id="backup">
+        <button class="page-back" type="button" data-back-fallback="#settings"><span data-icon="back"></span> 返回设置</button>
+        <div class="section-heading"><div><p class="eyebrow">让生活系统贴合自己</p><h2>数据备份</h2><p class="page-description">管理个人资料，并导出或安全合并你的学习、收支和工作记录。</p></div></div>
+        <div class="backup-grid">
+          <article class="panel backup-panel">
+            <div class="backup-icon" data-icon="export"></div><div class="panel-heading"><div><h3>导出备份</h3><p>选择兼容备份，或包含财务扩展的完整备份</p></div></div>
+            <ul class="backup-includes"><li>全部学习记录</li><li>全部收入与支出记录</li><li>全部工作任务及完成状态</li><li>每日记录和个人空间</li><li>查看日期和统计筛选设置</li></ul>
+            <button class="primary-button" id="backup-export" type="button">导出兼容 JSON v5</button><button class="secondary-button" id="backup-export-full" type="button">导出完整 JSON v6</button><p class="subtle-copy" id="backup-extension-note">v5 不含自选分类图标、预算和资产；完整备份请选择 v6。</p>
+          </article>
+          <article class="panel backup-panel">
+            <div class="backup-icon restore-icon" data-icon="restore"></div><div class="panel-heading"><div><h3>导入并恢复</h3><p>选择之前导出的 JSON 文件，检查摘要后确认合并</p></div></div>
+            <p class="merge-note"><strong>安全合并：</strong>已有记录会保留；完全相同的记录会跳过。发现同一 ID 对应不同内容时，将停止导入并提示你处理。</p>
+            <input class="hidden" id="backup-file" type="file" accept=".json,application/json">
+            <button class="secondary-button choose-backup" id="backup-choose" type="button">选择 JSON 备份文件</button>
+          </article>
+        </div>
+        <div class="backup-status" id="backup-status" role="status" aria-live="polite"></div>
+        <article class="panel backup-preview hidden" id="backup-preview">
+          <div class="panel-heading"><div><p class="eyebrow">确认前检查</p><h3>备份内容摘要</h3><p id="backup-file-name"></p></div><span class="soft-badge" id="backup-format-label">JSON 备份</span></div>
+          <div class="backup-summary-grid">
+            <div><span>学习记录</span><strong id="backup-study-count">0</strong></div>
+            <div><span>收支记录</span><strong id="backup-finance-count">0</strong></div>
+            <div><span>工作任务</span><strong id="backup-task-count">0</strong></div>
+            <div><span>每日记录</span><strong id="backup-daily-count">0</strong></div>
+            <div><span>妙想</span><strong id="backup-diary-count">0</strong></div>
+            <div><span>习惯</span><strong id="backup-habit-count">0</strong></div>
+            <div><span>长期目标</span><strong id="backup-goal-count">0</strong></div>
+            <div><span>收支分类</span><strong id="backup-category-count">0</strong></div>
+            <div><span>账单分类关联</span><strong id="backup-assignment-count">0</strong></div>
+            <div><span>相同记录（将跳过）</span><strong id="backup-duplicate-count">0</strong></div>
+          </div>
+          <p id="backup-meta-summary" class="subtle-copy"></p>
+          <p class="backup-import-plan" id="backup-import-plan"></p>
+          <p class="backup-exported-at" id="backup-exported-at"></p>
+          <p class="backup-conflict hidden" id="backup-conflict"></p>
+          <div class="backup-actions"><button class="primary-button" id="backup-import-confirm" type="button">确认安全合并</button><button class="secondary-button" id="backup-import-cancel" type="button">取消</button></div>
+        </article>
+      </section>
+      <section class="page-section" id="finance-detail-section"></section>
+      <dialog id="finance-month-dialog" class="editor-dialog" aria-labelledby="finance-month-title"><h2 id="finance-month-title">选择月份</h2><label>查看月份<input id="finance-period" type="month" aria-label="选择收支月份"></label><div class="form-row"><button class="secondary-button" id="finance-month-cancel" type="button">取消</button><button class="primary-button" id="finance-month-confirm" type="button">确定</button></div></dialog>
+      <section class="page-section" id="bill-section" aria-label="新增收支">
+        <div class="bill-sheet-backdrop" data-bill-sheet-backdrop></div>
+        <div class="bill-sheet-surface" role="dialog" aria-modal="true" aria-labelledby="bill-sheet-title">
+        <div class="bill-sheet-grabber" aria-hidden="true"></div>
+        <div class="bill-sheet-heading ui-sheet-header"><h2 id="bill-sheet-title">新增收支</h2><button class="ui-icon-button" type="button" data-back-fallback="#finance" aria-label="关闭新增收支"><span data-icon="close"></span></button></div>
+        <form id="bill-form" class="form-stack bill-form">
+          <fieldset class="bill-type segmented"><legend class="sr-only">账单类型</legend><label><input type="radio" name="bill-type" value="income" checked><span>收入</span></label><label><input type="radio" name="bill-type" value="expense"><span>支出</span></label></fieldset>
+          <div id="bill-category-step"><div class="panel-heading"><h3>选择分类</h3><a class="ui-icon-button" href="#categories" data-open-page aria-label="管理记账分类"><span data-icon="settings"></span></a></div><div id="bill-category-grid" class="category-choice-grid"></div></div>
+          <div id="bill-entry-step" class="form-stack hidden">
+          <button class="text-button" id="bill-categories-back" type="button"><span data-icon="back"></span> 重新选择分类</button>
+          <div class="form-row"><label>日期<input id="bill-date" type="date" required></label><label>分类<select id="bill-category" required></select></label></div>
+          <label class="bill-amount-label">金额 <span class="label-hint">USD</span><input id="bill-amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00" required></label>
+          <details class="compose-details"><summary>备注（可选）</summary><label class="sr-only" for="bill-note">账单备注</label><input id="bill-note" type="text" maxlength="120" placeholder="写下这笔收支的用途"></details>
+          <p id="bill-status" class="record-form-status" role="status" aria-live="polite"></p>
+          <div class="form-footer"><button class="secondary-button" type="button" data-back-fallback="#finance">取消</button><button class="primary-button" id="bill-submit" type="submit">保存账单</button></div>
+          </div>
+        </form>
+        </div>
+      </section>
+      <section class="page-section" id="categories-section">
+        <button class="page-back" type="button" data-back-fallback="#finance"><span data-icon="back"></span> 返回</button>
+        <div class="section-heading"><h2>收支分类</h2><label class="compact-field"><span class="sr-only">分类类型</span><select id="category-manage-type"><option value="income">收入</option><option value="expense">支出</option></select></label></div>
+        <form id="category-form" class="form-stack"><input id="category-id" type="hidden"><label>分类名称<input id="category-name" type="text" maxlength="30" placeholder="新建一个分类" required></label><div id="category-icon-slot"></div><div class="form-row"><button class="primary-button" id="category-submit" type="submit">新建分类</button><button class="secondary-button hidden" id="category-cancel" type="button">取消修改</button></div><p id="category-status" role="status" class="record-form-status"></p></form>
+        <p class="subtle-copy">改名用于今后的记账；历史账单保留保存时的分类名称。停用分类可随时恢复。</p>
+        <div class="settings-list" id="category-list"></div>
+      </section>
+      <section class="page-section" id="settings-section">
+        <button class="page-back" type="button" data-back-fallback="#personal"><span data-icon="back"></span> 返回我的</button>
+        <div class="section-heading"><h2>设置</h2></div>
+        <section class="settings-group"><h3>个人</h3><div class="settings-list"><button class="settings-row" type="button" data-open-profile><span>个人资料与财富目标</span><span>编辑 <span data-icon="chevronRight"></span></span></button></div></section>
+        <section class="settings-group"><h3>应用</h3><div class="settings-list"><div class="settings-row"><span>外观</span><span>黑白灰 · 默认</span></div><a class="settings-row" href="#categories" data-open-page><span>收支分类</span><span>管理 <span data-icon="chevronRight"></span></span></a></div></section>
+        <section class="settings-group"><h3>数据</h3><div class="settings-list"><a class="settings-row" href="#backup" data-open-page><span>导出与备份恢复</span><span>JSON <span data-icon="chevronRight"></span></span></a></div></section>
+        <section class="settings-group"><h3>关于</h3><div class="settings-list"><div class="settings-row"><span>版本</span><span>本地版 · JSON v5 / v6</span></div><div class="settings-row"><span>保存位置</span><span>当前设备的浏览器</span></div></div></section>
+      </section>
+      <section class="page-section" id="habit-detail-section"><article id="habit-detail" class="habit-detail"></article></section>
+      <section class="page-section" id="search-section">
+        <button class="page-back" type="button" data-back-fallback="#overview"><span data-icon="back"></span> 返回</button>
+        <div class="section-heading"><h2>搜索</h2><span class="subtle-copy">本地内容 · 默认全部日期</span></div>
+        <label class="search-field"><span class="sr-only">搜索本地内容</span><input id="global-query" type="search" placeholder="搜索妙想、任务、学习…"></label>
+        <div class="search-controls"><label><span class="sr-only">内容类型</span><select id="global-type"><option value="">全部类型</option><option value="note">妙想</option><option value="task">任务</option><option value="study">学习</option><option value="finance">收支</option><option value="habit">习惯</option><option value="goal">长期目标</option><option value="profile">个人资料</option></select></label><label><span class="sr-only">搜索日期（留空为全部日期）</span><input id="global-date" type="date" aria-label="搜索日期（留空为全部日期）"></label><button id="global-clear" class="text-button" type="button">清除</button></div>
+        <p id="global-status" class="subtle-copy" role="status"></p><div id="global-results" class="search-results"></div>
+        <nav class="history-pagination" aria-label="搜索结果分页"><button id="global-prev" class="secondary-button" type="button">上一页</button><span id="global-page"></span><button id="global-next" class="secondary-button" type="button">下一页</button></nav>
+      </section>
+      <section class="page-section" id="entry-detail-section"><article id="entry-detail"></article></section>
+      <footer class="page-footer">用心记录每一天 <span>·</span> 数据只保存在当前浏览器</footer>
+    </main>
+  </div>
+</body>
+</html>
