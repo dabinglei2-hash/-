@@ -30,3 +30,6 @@ coverage/
 Thumbs.db
 Desktop.ini
 *.tmp
+
+# Local skill distribution archive; editable skills are tracked separately
+/lifeos-skills-pack.zip

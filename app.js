@@ -5,7 +5,7 @@
   const PERSONAL_STORAGE_KEY = 'my-life-dashboard-personal-v1';
   const CATEGORY_STORAGE_KEY = 'my-life-dashboard-categories-v1';
   const BACKUP_FORMAT = 'my-life-dashboard-backup';
-  const BACKUP_VERSION = 5; // Compatibility export remains v5. Full export is explicitly v6.
+  const BACKUP_VERSION = 5; // Compatibility v5; financial v6; schedule v7; complete learning backup v8.
   let financeMeta = window.LifeFinanceMeta.blank();
   let financeMetaError = '';
   let financeMonthBefore = null;
@@ -35,9 +35,21 @@
   let dataError = '';
   let dataSnapshotRaw = null;
   let data = loadData();
+  let scheduleMetaError = '';
+  let scheduleSnapshotRaw = null;
+  let scheduleMeta = loadScheduleMeta();
+  let learningMetaError = '';
+  let learningSnapshotRaw = null;
+  let learningMeta = loadLearningMeta();
+  let learningRouteActive = false;
+  let taskEditExpected = null;
+  let taskSavePending = false;
+  let scheduleGenerationPending = false;
   let personalDataError = '';
   let personalSnapshotRaw = null;
   let personalData = loadPersonalData();
+  let profileReturnFocus = null;
+  let profileSavePending = false;
   let categoryError = '';
   let categoryData = loadCategoryData();
   let noteTagsError = '';
@@ -266,6 +278,8 @@
       snapshots.forEach(([key, before, after]) => {
         if (key === STORAGE_KEY) dataSnapshotRaw = after;
         if (key === PERSONAL_STORAGE_KEY) personalSnapshotRaw = after;
+        if (key === window.LifeSchedule.key) scheduleSnapshotRaw = after;
+        if (key === window.LifeLearning.key) learningSnapshotRaw = after;
       });
       return '';
     } catch (error) {
@@ -358,6 +372,178 @@
     }
   }
 
+  function loadScheduleMeta() {
+    const stored = window.LifeSchedule.read(localStorage, data.tasks);
+    scheduleSnapshotRaw = stored.raw;
+    scheduleMetaError = stored.error;
+    return stored.data || window.LifeSchedule.blank();
+  }
+
+  function saveSchedule(nextData, nextMeta) {
+    const S = window.LifeSchedule;
+    if (dataError || scheduleMetaError || learningMetaError) return dataError || scheduleMetaError || learningMetaError;
+    const nextLearning = window.LifeLearning.reconcile(learningMeta, nextData);
+    const validation = validateData(nextData) || S.validate(nextMeta, nextData.tasks) || window.LifeLearning.validate(nextLearning,nextData);
+    if (validation) return validation;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== dataSnapshotRaw || localStorage.getItem(S.key) !== scheduleSnapshotRaw || localStorage.getItem(window.LifeLearning.key) !== learningSnapshotRaw) {
+        data = loadData(); scheduleMeta = loadScheduleMeta(); learningMeta = loadLearningMeta(); render();
+        return '另一页面已更新日程。已重新读取，输入保留；请核对后重试。';
+      }
+    } catch (error) { return '无法读取浏览器存储，输入已保留。'; }
+    const entries = [[STORAGE_KEY, nextData]];
+    if (S.hasData(nextMeta) || scheduleSnapshotRaw !== null) entries.push([S.key, nextMeta]);
+    if (JSON.stringify(nextLearning) !== JSON.stringify(learningMeta)) entries.push([window.LifeLearning.key, nextLearning]);
+    const error = writeStoreTransaction(entries);
+    if (error) { data = loadData(); scheduleMeta = loadScheduleMeta(); learningMeta = loadLearningMeta(); render(); return error; }
+    data = nextData; scheduleMeta = nextMeta; learningMeta = nextLearning;
+    return '';
+  }
+
+  function loadLearningMeta() {
+    const stored = window.LifeLearning.read(localStorage, data);
+    learningSnapshotRaw = stored.raw; learningMetaError = stored.error;
+    return stored.data;
+  }
+
+  // Guard all affected snapshots; the shared writer attempts rollback on storage failure.
+  function saveLearning(nextData, nextLearning, nextSchedule = scheduleMeta) {
+    const L = window.LifeLearning, S = window.LifeSchedule;
+    const error = dataError || scheduleMetaError || learningMetaError || validateData(nextData)
+      || S.validate(nextSchedule, nextData.tasks) || L.validate(nextLearning, nextData);
+    if (error) return error;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== dataSnapshotRaw || localStorage.getItem(S.key) !== scheduleSnapshotRaw
+        || localStorage.getItem(L.key) !== learningSnapshotRaw) {
+        data = loadData(); scheduleMeta = loadScheduleMeta(); learningMeta = loadLearningMeta(); render();
+        return '另一页面已更新学习或日程，已重新读取。输入保留，请核对后重试。';
+      }
+    } catch (error) { return '无法读取浏览器存储，输入已保留：' + error.message; }
+    const entries = [[L.key, nextLearning]];
+    // Write the canonical record first; a reserved ID makes an interrupted timer save detectable.
+    if (JSON.stringify(nextData) !== JSON.stringify(data)) entries.unshift([STORAGE_KEY, nextData]);
+    if (JSON.stringify(nextSchedule) !== JSON.stringify(scheduleMeta)) entries.push([S.key, nextSchedule]);
+    const saveError = writeStoreTransaction(entries);
+    if (saveError) { data = loadData(); scheduleMeta = loadScheduleMeta(); learningMeta = loadLearningMeta(); return saveError; }
+    data = nextData; learningMeta = nextLearning; scheduleMeta = nextSchedule;
+    populateMonthYears(); render(); return '';
+  }
+
+  function saveLearningGoal(date, value) {
+    const L = window.LifeLearning, next = L.clone(learningMeta);
+    if (!L.dateValid(date) || value !== '' && !L.minutes(Number(value))) return '目标需为1–1440整数分钟；留空可移除目标。';
+    next.dailyGoals = next.dailyGoals.filter(row => row.date !== date);
+    if (value !== '') next.dailyGoals.push({ date, minutes: Number(value) });
+    return saveLearning(data, next);
+  }
+
+  function saveLearningPlan(fields, expected) {
+    const L = window.LifeLearning, S = window.LifeSchedule;
+    const next = L.clone(learningMeta), nextData = L.clone(data), nextSchedule = S.clone(scheduleMeta);
+    if (!L.minutes(Number(fields.estimatedMinutes))) return '预计时长需为1–1440整数分钟。';
+    let task;
+    if (fields.linkId) {
+      task = nextData.tasks.find(row => row.id === fields.linkId);
+      if (!task) return '所选日程已不存在，请重新选择。';
+      if (next.plans.some(row => row.taskId === task.id && !row.archived)) return '此日程已关联学习计划，请直接编辑原计划。';
+    } else {
+      const old = fields.id ? nextData.tasks.find(row => row.id === fields.id) : null;
+      if (fields.id && (!old || expected !== JSON.stringify({ task: old, plan: next.plans.find(row => row.taskId === fields.id), detail: S.detailFor(scheduleMeta, fields.id) }))) return '计划已变化，请重新打开编辑；当前输入保留。';
+      task = old ? { ...old, title: fields.title.trim(), date: fields.date }
+        : { id: makeId(), date: fields.date, title: fields.title.trim(), start: '', end: '', completed: false, createdAt: Date.now() };
+      const error = S.planError(task);
+      if (error) return error;
+      if (old) nextData.tasks[nextData.tasks.findIndex(row => row.id === task.id)] = task;
+      else nextData.tasks.push(task);
+      const detail = { ...S.detailFor(nextSchedule, task.id), priority: fields.priority || null };
+      nextSchedule.taskDetails = nextSchedule.taskDetails.filter(row => row.taskId !== task.id).concat(detail);
+    }
+    next.plans = next.plans.filter(row => row.taskId !== task.id).concat({ taskId: task.id, estimatedMinutes: Number(fields.estimatedMinutes), archived: false });
+    return saveLearning(nextData, next, nextSchedule);
+  }
+
+  function archiveLearningPlan(id) {
+    const next = window.LifeLearning.clone(learningMeta), plan = next.plans.find(row => row.taskId === id);
+    if (!plan) return '计划已不存在。';
+    plan.archived = true; return saveLearning(data, next);
+  }
+
+  function focusAction(action, fields = {}) {
+    const L = window.LifeLearning, next = L.clone(learningMeta), session = L.active(next), now = Date.now();
+    if (action === 'start') {
+      if (session) return '请先保存或取消当前计时。';
+      const title = String(fields.title || '').trim(), taskId = fields.taskId || null;
+      if (!title || title.length > 100) return '计时主题需为1–100字；较长的日程标题请在此调整。';
+      if (taskId && !next.plans.some(row => row.taskId === taskId && !row.archived && data.tasks.some(task => task.id === taskId))) return '关联计划已不存在，请重新选择。';
+      next.focusSessions.push({ id: makeId(), taskId, title, date: today(), status: 'running', accumulatedMs: 0,
+        startedAt: now, endedAt: null, studyRecordId: makeId(), recordDeleted: false, createdAt: now, updatedAt: now });
+    } else {
+      if (!session) return '没有待处理计时。';
+      if (action === 'save') {
+        if (session.status !== 'ended') return '请先结束计时，再确认保存。';
+        const duration = Math.floor(session.accumulatedMs / 60000), date = fields.date;
+        if (!L.dateValid(date)) return '请选择实际学习日期。';
+        if (duration < 1) return '不足1完整分钟，成果已保留；可继续计时后再保存。';
+        if (duration > 1440) return '超过单条1440分钟上限，成果已保留；请手动分日记录后取消本次待保存计时。';
+        const record = { id: session.studyRecordId, date, content: session.title, duration, createdAt: session.createdAt };
+        const old = data.studies.find(row => row.id === record.id);
+        if (old && Object.keys(record).some(key => old[key] !== record[key])) return '预留 ID 已有不同内容，已停止保存，不会覆盖原记录。';
+        const nextData = old ? data : { ...data, studies: data.studies.concat(record) };
+        session.status = 'saved'; session.date = date; session.updatedAt = now;
+        return saveLearning(nextData, next);
+      }
+      const result = L.transition(session, action, now);
+      if (result.error) return result.error;
+      next.focusSessions[next.focusSessions.findIndex(row => row.id === session.id)] = result.row;
+    }
+    return saveLearning(data, next);
+  }
+
+  async function newLearningRecord(taskId) {
+    if ((otherDraftForms.has('study-form') || recordEditors.study) && !await confirmAction('放弃当前学习编辑，打开新增记录？', '新增学习', '放弃并新增')) return;
+    resetRecordForm('study'); window.LifeLearningUI.showRecords(true);
+    $('#study-date').value = taskId ? today() : selectedDate();
+    const task = data.tasks.find(row => row.id === taskId);
+    if (task) {
+      if (task.title.length <= 100) { $('#study-content').value = task.title; otherDraftForms.add('study-form'); }
+      else recordStatus('study', '日程标题超过100字，请为实际记录填写较短主题。');
+    }
+    $('#study-content').focus();
+  }
+
+  function saveScheduleSeries(row, expected) {
+    const existing = scheduleMeta.series.find(value => value.id === row.id);
+    if ((existing ? JSON.stringify(existing) : null) !== expected) return '该规则已变化，未覆盖。请保留输入并重新核对。';
+    const next = window.LifeSchedule.clone(scheduleMeta);
+    next.series = next.series.filter(value => value.id !== row.id).concat(row);
+    const error = saveSchedule({ ...data }, next);
+    if (!error) { render(); toast('重复规则已保存 · 尚未自动生成任务'); }
+    return error;
+  }
+
+  function toggleScheduleSeries(id) {
+    const next = window.LifeSchedule.clone(scheduleMeta), series = next.series.find(row => row.id === id);
+    if (!series) return;
+    series.active = !series.active; series.updatedAt = Date.now();
+    const error = saveSchedule({ ...data }, next);
+    if (error) toast(error, true); else { render(); toast(series.active ? '规则已启用 · 请确认生成' : '规则已暂停 · 已有日程保留'); }
+  }
+
+  async function generateScheduleSeries(id) {
+    if (scheduleGenerationPending) return;
+    scheduleGenerationPending = true;
+    try {
+      const result = window.LifeSchedule.generate(scheduleMeta, data.tasks, id, makeId, Date.now());
+      if (result.error) { toast(result.error, true); return; }
+      if (!result.count) { toast('没有待生成的日期；已存在或已删除的实例不会重复生成。'); return; }
+      const added = result.tasks.filter(task => !data.tasks.some(old => old.id === task.id));
+      const overlaps = added.filter(task => window.LifeSchedule.conflicts(task, data.tasks).length).length;
+      if (!await confirmAction(`将新增 ${result.count} 项日程（${added[0].date} 至 ${added[added.length-1].date}），其中 ${overlaps} 项与现有安排时间重叠。新实例均为未完成；已有及已删除实例跳过，历史完成状态保留。`, '预览重复日程', '确认生成')) return;
+      const error = saveSchedule({ ...data, tasks: result.tasks }, result.meta);
+      if (error) toast(error, true); else { populateMonthYears(); render(); toast(`已生成 ${result.count} 项日程`); }
+    } finally { scheduleGenerationPending = false; }
+  }
+
   function savePersonalData() {
     if (personalDataError) {
       toast(personalDataError, true);
@@ -448,7 +634,7 @@
     $('#task-progress-bar').style.width = `${percent}%`;
     $('#task-fraction').textContent = `${completed} / ${tasks.length} 项`;
     $('#task-total').textContent = `${completed} / ${tasks.length} 项`;
-    $('#task-list-view .section-heading h2').textContent = (date === today() ? '今日' : '当日') + '工作计划';
+    $('#task-list-view .section-heading h2').textContent = (date === today() ? '今日' : '当日') + '安排';
     $('#task-badge').textContent = countLabel(tasks.length, '项任务');
     $('#progress-title').textContent = tasks.length ? (completed === tasks.length ? '今天的任务都完成了' : `已经完成 ${completed} 项任务`) : '今天还没有任务';
     renderWorkspaceHome();
@@ -465,8 +651,9 @@
     renderFinanceOverview();
     renderInsights();
     renderCategories();
+    window.LifeLearningUI.render();
     if (window.LifeFinanceViews.match(location.hash)) window.LifeFinanceViews.renderRoute(location.hash);
-    const readErrors = [dataError, personalDataError, categoryError, noteTagsError, financeMetaError].filter(Boolean).join(' ');
+    const readErrors = [dataError, personalDataError, categoryError, noteTagsError, financeMetaError, scheduleMetaError, learningMetaError].filter(Boolean).join(' ');
     $('#app-status').textContent = readErrors;
     $('#app-status').classList.toggle('hidden', !readErrors);
   }
@@ -502,7 +689,14 @@
     const minutes = data.studies.reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
     $('#personal-study-minutes').textContent = minutes;
     $('#personal-study-days').textContent = studyDays.length;
-    $('#personal-study-streak').textContent = currentLearningStreak(studyDays);
+    const streak = currentLearningStreak(studyDays);
+    $('#personal-study-streak').textContent = streak;
+    const week = window.LifeInsights.summarize(data, 'week', today());
+    const todayMinutes = data.studies.filter(row => row.date === today()).reduce((sum,row) => sum + row.duration, 0);
+    const dailyGoal = learningMeta.dailyGoals.find(row => row.date === today())?.minutes;
+    $('#my-growth-meta').textContent = minutes + ' 分钟';
+    $('#my-growth-sub').textContent = '本周 ' + week.totals.studyMinutes + ' 分钟 · 连续 ' + streak + ' 天';
+    $('#personal-growth-extra').textContent = '本周 ' + week.totals.studyMinutes + ' 分钟 · ' + (dailyGoal ? '今日目标 ' + Math.round(todayMinutes / dailyGoal * 100) + '%（' + todayMinutes + '/' + dailyGoal + ' 分钟）' : '今日学习目标未设置');
 
     const incomeCents = centsTotal(data.finances, 'income');
     const expenseCents = centsTotal(data.finances, 'expense');
@@ -515,6 +709,13 @@
     $('#wealth-progress-label').textContent = targetCents ? `${money(netCents / 100)} / ${money(targetCents / 100)} 目标` : '请在个人设置中填写财富目标';
     $('#wealth-progress-percent').textContent = `${progress}%`;
     $('#wealth-progress-bar').style.width = `${progress}%`;
+    $('#wealth-progress-percent').classList.toggle('hidden', !targetCents);
+    $('#wealth-progress-bar').parentElement.classList.toggle('hidden', !targetCents);
+    const month = window.LifeInsights.summarize(data, 'month', today());
+    $('#my-wealth-meta').textContent = data.finances.length ? money(netCents / 100) : '尚无流水';
+    $('#my-wealth-sub').textContent = month.hasFinancialRecords ? '本月结余 ' + money(month.totals.balanceCents / 100) + ' · USD' : '本月暂无流水 · USD';
+    $('#personal-finance-month').textContent = month.label + ' · 收入 ' + money(month.totals.incomeCents / 100) + ' · 支出 ' + money(month.totals.expenseCents / 100);
+    $('#my-skills-meta').textContent = SKILL_DEFINITIONS.length + ' 项自评';
 
     renderSkills();
     renderDiary();
@@ -618,6 +819,21 @@
     $('#profile-goal-input').value = personalData.profile.goal;
     $('#profile-motto-input').value = personalData.profile.motto;
     $('#wealth-target-input').value = personalData.wealthTarget ?? '';
+  }
+
+  function profileStatus(message, error = false) {
+    $('#personal-profile-status').textContent = message;
+    $('#personal-profile-status').classList.toggle('is-error', error);
+  }
+
+  function openPersonalProfile() {
+    const dialog = $('#personal-settings');
+    if (dialog.open) return;
+    if (!otherDraftForms.has('personal-settings-form')) { fillPersonalSettingsForm(); profileStatus(''); }
+    else profileStatus('已保留上次未保存的输入。');
+    profileReturnFocus = document.activeElement;
+    dialog.showModal();
+    $('#profile-nickname-input').focus();
   }
 
   function clonePersonalData() { return JSON.parse(JSON.stringify(personalData)); }
@@ -1089,12 +1305,14 @@
   }
 
   function validateBackup(backup) {
-    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
+    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6, 7, 8].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
     const backupKeys = backup.schemaVersion === 1
       ? ['format', 'schemaVersion', 'exportedAt', 'data', 'settings']
       : backup.schemaVersion >= 4 ? ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'financeCategories', 'settings'] : ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'settings'];
     if (backup.schemaVersion >= 5) backupKeys.push('noteTags');
-    if (backup.schemaVersion === 6) backupKeys.push('financeMeta');
+    if (backup.schemaVersion >= 6) backupKeys.push('financeMeta');
+    if (backup.schemaVersion >= 7) backupKeys.push('scheduleMeta');
+    if (backup.schemaVersion === 8) backupKeys.push('learningMeta');
     if (!hasExactKeys(backup, backupKeys)) return '文件不是有效的生活管理台备份。';
     if (typeof backup.exportedAt !== 'string' || !Number.isFinite(Date.parse(backup.exportedAt))) return '备份时间字段无效。';
     const dataError = validateData(backup.data);
@@ -1109,7 +1327,9 @@
       if (categoryError) return '备份分类数据无效：' + categoryError;
     }
     if (backup.schemaVersion >= 5) { const error = window.LifeContent.validate(backup.noteTags, backup.personal.diary); if (error) return error; }
-    if (backup.schemaVersion === 6) { const error = window.LifeFinanceMeta.validate(backup.financeMeta, backup.financeCategories, window.LifeIcons.names); if (error) return error; }
+    if (backup.schemaVersion >= 6) { const error = window.LifeFinanceMeta.validate(backup.financeMeta, backup.financeCategories, window.LifeIcons.names); if (error) return error; }
+    if (backup.schemaVersion >= 7) { const error = window.LifeSchedule.validate(backup.scheduleMeta, backup.data.tasks); if (error) return error; }
+    if (backup.schemaVersion === 8) { const error = window.LifeLearning.validate(backup.learningMeta, backup.data, true); if (error) return error; }
     const settingsKeys = backup.schemaVersion === 1
       ? ['selectedDate', 'monthYear', 'monthMonth']
       : backup.schemaVersion >= 4 ? ['selectedDate', 'monthYear', 'monthMonth', 'personalDate', 'financePeriod', 'insightsPeriod', 'insightsAnchor'] : ['selectedDate', 'monthYear', 'monthMonth', 'personalDate'];
@@ -1255,10 +1475,16 @@
     const tagReferenceError = !tagMerge.error && personalMerge.merged ? window.LifeContent.validate(tagMerge.merged, personalMerge.merged.diary) : '';
     const storedMeta = readFinanceMeta(storedCategories.data);
     const metaMerge = storedMeta.error ? { error: storedMeta.error, merged: null } : window.LifeFinanceMeta.merge(storedMeta.data, backup.financeMeta || window.LifeFinanceMeta.blank(), categoryMerge.merged || storedCategories.data, window.LifeIcons.names);
+    const storedSchedule = window.LifeSchedule.read(localStorage, currentData.tasks);
+    const scheduleMerge = storedSchedule.error ? { error: storedSchedule.error, merged: null }
+      : window.LifeSchedule.merge(storedSchedule.data, backup.scheduleMeta || window.LifeSchedule.blank(), currentData.tasks.concat(dataMerge.additions.tasks));
+    const mergedCore = Object.fromEntries(['studies','finances','tasks'].map(name => [name, currentData[name].concat(dataMerge.additions[name])]));
+    const storedLearning = window.LifeLearning.read(localStorage, currentData);
+    const learningMerge = storedLearning.error ? { error:storedLearning.error } : window.LifeLearning.merge(storedLearning.data, backup.learningMeta || window.LifeLearning.blank(), mergedCore);
     return {
-      error: dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error,
+      error: storedLearning.error || learningMerge.conflicts?.join('；') || dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error || scheduleMerge.error,
       duplicates: dataMerge.duplicates + personalMerge.duplicates + categoryMerge.duplicates,
-      additions: dataMerge.additions, personal: personalMerge, categories: categoryMerge, noteTags: tagMerge, financeMeta: metaMerge,
+      additions: dataMerge.additions, personal: personalMerge, categories: categoryMerge, noteTags: tagMerge, financeMeta: metaMerge, scheduleMeta: scheduleMerge, learningMeta:learningMerge,
     };
   }
 
@@ -1274,7 +1500,9 @@
     $('#backup-preview').classList.remove('hidden');
     $('#backup-file-name').textContent = fileName;
     const meta = backup.financeMeta;
-    $('#backup-meta-summary').textContent = meta ? '完整 v6：分类图标 ' + meta.categoryIcons.length + ' 项 · 预算 ' + meta.budgets.length + ' 项 · 资产/负债账户 ' + meta.accounts.length + ' 项（含归档）。' : '旧版备份：现有分类图标、预算与账户会保留。';
+    $('#backup-meta-summary').textContent = meta ? '财务扩展：分类图标 ' + meta.categoryIcons.length + ' 项 · 预算 ' + meta.budgets.length + ' 项 · 资产/负债账户 ' + meta.accounts.length + ' 项（含归档）。' : '旧版备份：现有分类图标、预算与账户会保留。';
+    $('#backup-learning-summary').textContent = backup.learningMeta ? '学习扩展：目标 ' + backup.learningMeta.dailyGoals.length + ' 项 · 计划关联 ' + backup.learningMeta.plans.length + ' 项 · 计时 ' + backup.learningMeta.focusSessions.length + ' 次。运行计时以暂停副本恢复，需手动继续；冲突停止。' : '此版本不含学习扩展；当前目标、计划与计时将保留。完整备份请选择 v8。';
+    $('#backup-schedule-summary').textContent = backup.scheduleMeta ? '日程扩展：备注/优先级/截止日 ' + backup.scheduleMeta.taskDetails.length + ' 条 · 重复规则 ' + backup.scheduleMeta.series.length + ' 项 · 实例标记 ' + backup.scheduleMeta.occurrences.length + ' 条；冲突停止。' : '此备份不含日程扩展；现有规则、备注与实例标记会保留。';
     $('#backup-study-count').textContent = backup.data.studies.length;
     $('#backup-finance-count').textContent = backup.data.finances.length;
     $('#backup-task-count').textContent = backup.data.tasks.length;
@@ -1323,6 +1551,7 @@
   }
 
   function exportBackup(full = false) {
+    const version = full === 8 ? 8 : full === 7 ? 7 : full ? 6 : 5;
     const stored = readStoredDataForBackup();
     if (stored.error) { setBackupStatus(stored.error, 'error'); return; }
     const storedPersonal = readStoredPersonalForBackup();
@@ -1357,6 +1586,20 @@
       if (storedMeta.error) { setBackupStatus(storedMeta.error, 'error'); return; }
       backup.schemaVersion = 6; backup.financeMeta = storedMeta.data;
     }
+    if (version >= 7) {
+      const storedSchedule = window.LifeSchedule.read(localStorage, stored.data.tasks);
+      if (storedSchedule.error) { setBackupStatus(storedSchedule.error, 'error'); return; }
+      backup.schemaVersion = 7; backup.scheduleMeta = storedSchedule.data;
+    }
+    if (version === 8) {
+      const storedLearning = window.LifeLearning.read(localStorage, stored.data);
+      if (storedLearning.error) { setBackupStatus(storedLearning.error,'error'); return; }
+      const frozen = window.LifeLearning.freeze(storedLearning.data, Date.parse(backup.exportedAt));
+      if (frozen.error) { setBackupStatus(frozen.error,'error'); return; }
+      backup.schemaVersion = 8; backup.learningMeta = frozen.data;
+    }
+    const validation = validateBackup(backup);
+    if (validation) { setBackupStatus(validation,'error'); return; }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1367,7 +1610,8 @@
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setBackupStatus((full ? '完整 v6：已包含分类图标、预算和账户。' : '兼容 v5：不含自选分类图标、预算和资产，请另外导出完整 v6。') + `备份导出成功：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请妥善保存下载的 JSON 文件。`, 'success');
+    setBackupStatus((version === 8 ? '完整 v8：包含学习、财务、日程扩展；运行计时的副本已暂停。' : version === 7 ? '日程 v7：不含学习扩展，完整备份请选择 v8。' : version === 6 ? '财务 v6：不含日程和学习扩展；完整备份请选择 v8。' : '兼容 v5：不含财务、日程和学习扩展；完整备份请选择 v8。') + `已发起 JSON 下载：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请在浏览器下载列表确认文件保存完成。`, 'success');
+    $('#backup-session-info').textContent = '本次会话最近发起导出：' + new Date(backup.exportedAt).toLocaleString('zh-CN') + ' · JSON v' + backup.schemaVersion + '。这不是已验证的最近备份时间；刷新后不保留此提示。';
   }
 
   async function inspectBackupFile(file) {
@@ -1430,9 +1674,15 @@
     if (keepTags) entries.push([NOTE_TAGS_KEY, analysis.noteTags.merged]);
     const keepMeta = window.LifeFinanceMeta.hasData(analysis.financeMeta.merged) || localStorage.getItem(window.LifeFinanceMeta.key) !== null;
     if (keepMeta) entries.push([window.LifeFinanceMeta.key, analysis.financeMeta.merged]);
+    const keepSchedule = window.LifeSchedule.hasData(analysis.scheduleMeta.merged) || localStorage.getItem(window.LifeSchedule.key) !== null;
+    if (keepSchedule) entries.push([window.LifeSchedule.key, analysis.scheduleMeta.merged]);
+    const keepLearning = window.LifeLearning.hasData(analysis.learningMeta.merged) || localStorage.getItem(window.LifeLearning.key) !== null;
+    if (keepLearning) entries.push([window.LifeLearning.key,analysis.learningMeta.merged]);
     const error = writeStoreTransaction(entries);
     if (error) { setBackupStatus(error, 'error'); return; }
+    learningMeta = analysis.learningMeta.merged; learningMetaError = '';
     financeMeta = analysis.financeMeta.merged; financeMetaError = '';
+    scheduleMeta = analysis.scheduleMeta.merged; scheduleMetaError = '';
     noteTags = analysis.noteTags.merged;
     noteTagsError = '';
     data = nextData; personalData = nextPersonal;
@@ -1455,7 +1705,7 @@
   function renderStudies(items) {
     const body = $('#study-table');
     body.innerHTML = items.map((item) => `
-      <tr><td><span class="cell-main">${escapeHtml(item.content)}</span><span class="cell-sub">${escapeHtml(item.date)}</span></td>
+      <tr><td><a class="cell-main" href="#entry/study/${encodeURIComponent(item.id)}" data-open-page>${escapeHtml(item.content)}</a><span class="cell-sub">${escapeHtml(item.date)}</span></td>
       <td data-label="时长">${Number(item.duration)} 分钟</td><td><div class="record-row-actions"><button type="button" class="icon-button" data-edit-study="${escapeHtml(item.id)}" aria-label="编辑学习记录">编辑</button><button type="button" class="icon-button delete-button" data-delete-study="${escapeHtml(item.id)}" aria-label="删除学习记录">删除</button></div></td></tr>`).join('');
     $('#study-empty').classList.toggle('hidden', items.length > 0);
   }
@@ -1524,17 +1774,7 @@
   }
 
   function renderTasks(items) {
-    const list = $('#task-list');
-    list.innerHTML = items.slice().sort((a, b) => (a.start || '99:99').localeCompare(b.start || '99:99') || a.createdAt - b.createdAt).map((item) => {
-      const time = item.start || item.end ? `${item.start || '未设定'} – ${item.end || '未设定'}` : '未设置时间';
-      return `<div class="task-item ${item.completed ? 'completed' : ''}">
-        <label class="task-check-hit"><input class="task-checkbox" type="checkbox" data-toggle-task="${escapeHtml(item.id)}" ${item.completed ? 'checked' : ''} aria-label="完成任务：${escapeHtml(item.title)}"></label>
-        <div><a class="task-name task-detail-link" data-open-task="${escapeHtml(item.id)}" href="#task/${encodeURIComponent(item.id)}">${escapeHtml(item.title)}</a><div class="task-time">${escapeHtml(time)}</div></div>
-        <div class="task-actions"><button type="button" class="icon-button" data-edit-task="${escapeHtml(item.id)}">编辑</button><button type="button" class="icon-button delete-button" data-delete-task="${escapeHtml(item.id)}">删除</button></div>
-      </div>`;
-    }).join('');
-    $('#task-empty').classList.toggle('hidden', items.length > 0);
-    $('#task-empty strong').textContent = selectedDate() === today() ? '今天还没有任务' : '这一天还没有任务';
+    window.LifeScheduleUI.render(items, data.tasks, scheduleMeta, selectedDate());
   }
 
   const compareTaskOrder = (a, b) => (a.start || '99:99').localeCompare(b.start || '99:99') || a.createdAt - b.createdAt;
@@ -1554,8 +1794,8 @@
     if (dataError) { toast(dataError, true); return; }
     if (!data.tasks.some((task) => task.id === taskId)) return;
     const currentRoute = window.location.hash || '#overview';
-    const returnRoute = ['#tasks', '#overview', '#search'].includes(currentRoute) ? currentRoute : '#tasks';
-    const sourceSelector = returnRoute === '#search' ? '#global-results' : '#task-list';
+    const returnRoute = ['#tasks', '#overview', '#search', '#learning'].includes(currentRoute) ? currentRoute : '#tasks';
+    const sourceSelector = returnRoute === '#search' ? '#global-results' : returnRoute === '#learning' ? '#learning-plan-list' : '#task-list';
     let taskIds = [...document.querySelectorAll(`${sourceSelector} [data-open-task]`)]
       .map((link) => link.dataset.openTask)
       .filter((id) => data.tasks.some((task) => task.id === id));
@@ -1597,6 +1837,17 @@
     $('#task-detail-date').textContent = task.date;
     $('#task-detail-time').textContent = task.start || task.end ? `${task.start || '未设定'} – ${task.end || '未设定'}` : '未安排时间';
     $('#task-detail-status').textContent = task.completed ? '已完成' : '待完成';
+    const details = window.LifeSchedule.detailFor(scheduleMeta, taskId);
+    const source = scheduleMeta.occurrences.find(row => row.taskId === taskId && !row.excluded);
+    $('#task-detail-extra').innerHTML = '<dl class="schedule-detail-meta"><div><dt>优先级</dt><dd>' + escapeHtml(window.LifeScheduleUI.priorityLabel(details.priority) || '未设置') + '</dd></div><div><dt>截止日期</dt><dd>' + escapeHtml(details.deadline || '未设置') + '</dd></div>'
+      + (source ? '<div><dt>重复规则</dt><dd>' + escapeHtml(scheduleMeta.series.find(row => row.id === source.seriesId)?.title || '') + '</dd></div>' : '') + '</dl>'
+      + (details.note ? '<h3>备注</h3><p class="schedule-detail-note">' + escapeHtml(details.note) + '</p>' : '')
+      + (window.LifeSchedule.duration(task) ? '<p class="subtle-copy">计划 ' + window.LifeSchedule.duration(task) + ' 分钟；不代表实际学习或工作时长。</p>' : '');
+    $('#task-detail-actions').innerHTML = '<label class="secondary-button schedule-complete-action"><input type="checkbox" data-toggle-task="' + escapeHtml(task.id) + '"' + (task.completed ? ' checked' : '') + '>已完成</label><button type="button" class="secondary-button" data-edit-task="' + escapeHtml(task.id) + '">编辑</button><button type="button" class="secondary-button delete-button" data-delete-task="' + escapeHtml(task.id) + '">删除</button>';
+    if (learningMeta.plans.some(row=>row.taskId===taskId&&!row.archived)) {
+      const start = document.createElement('button'); start.type='button'; start.className='secondary-button'; start.textContent='开始学习';
+      start.addEventListener('click',()=>{openUiPage('#learning');window.LifeLearningUI.prepareFocus(taskId);}); $('#task-detail-actions').append(start);
+    }
     $('#task-sequence').textContent = `${index + 1} / ${ids.length}`;
     $('#task-previous').disabled = index <= 0;
     $('#task-next').disabled = index < 0 || index >= ids.length - 1;
@@ -1628,7 +1879,7 @@
 
   function returnFromTaskDetail() {
     const context = taskNavigationState();
-    if (!context || !['#overview', '#tasks', '#search'].includes(context.returnRoute)) {
+    if (!context || !['#overview', '#tasks', '#search', '#learning'].includes(context.returnRoute)) {
       routeToTaskList();
       return;
     }
@@ -1640,7 +1891,7 @@
     data = loadData();
     if (context.selectedDate && context.selectedDate !== selectedDate()) {
       $('#selected-date').value = context.selectedDate;
-      if (!recordEditors.study) $('#study-date').value = context.selectedDate;
+      if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = context.selectedDate;
       if (!recordEditors.finance) $('#finance-date').value = context.selectedDate;
       $('#task-date').value = context.selectedDate;
       fillDailyRecordForm(context.selectedDate);
@@ -1664,9 +1915,15 @@
     $('#task-form').reset();
     $('#task-id').value = '';
     $('#task-date').value = selectedDate();
-    $('#task-form-title').textContent = '添加工作任务';
+    taskEditExpected = null;
+    $('#task-form-title').textContent = '添加日程';
+    $('#task-priority').value = '';
+    $('#task-deadline').value = '';
+    $('#task-note').value = '';
+    window.LifeScheduleUI.formStatus('');
     $('#task-submit').innerHTML = '添加任务 <span><span data-icon="add"></span></span>';
-    $('#task-cancel').classList.add('hidden');
+    $('#task-cancel').classList.remove('hidden');
+    $('#task-cancel').textContent = '清空草稿';
   }
 
   function recordStatus(type, message, error = false) {
@@ -1730,6 +1987,7 @@
     recordEditors[type] = { id, expected: JSON.parse(JSON.stringify(record)) };
     $(`#${type}-date`).value = record.date;
     if (type === 'study') {
+      window.LifeLearningUI.showRecords();
       $('#study-content').value = record.content;
       $('#study-duration').value = record.duration;
       $('#study-duration').min = record.duration === 0 ? '0' : '1';
@@ -1785,17 +2043,19 @@
     populateMonthYears();
     render();
     recordStatus(type, `${result.edited ? '修改已保存' : '记录已添加'} · ${result.record.date}。历史明细与统计已更新。`);
+    if (type === 'study') toast(result.edited ? '学习修改已保存' : '学习记录已添加');
     if (type === 'finance') { window.LifeUI.closeSheet($('#finance-editor')); toast(result.edited ? '账单修改已保存' : '账单已添加'); }
   }
 
   $('#selected-date').addEventListener('change', (event) => {
     historyPages.study = historyPages.finance = 1;
     const date = event.target.value || today();
-    if (!recordEditors.study) $('#study-date').value = date;
+    if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = date;
     if (!recordEditors.finance) $('#finance-date').value = date;
     if (!otherDraftForms.has('task-form')) $('#task-date').value = date;
     fillDailyRecordForm(date);
     render();
+    rememberView();
   });
 
   $('#month-year').addEventListener('change', renderMonthly);
@@ -1812,26 +2072,43 @@
     renderDiary();
     renderHabits();
   });
-  $('#personal-settings-toggle').addEventListener('click', () => {
-    const settings = $('#personal-settings');
-    if (!settings.open) {
-      if (!otherDraftForms.has('personal-settings-form')) fillPersonalSettingsForm();
-      settings.showModal();
-    }
+  $('#personal-settings-toggle').addEventListener('click', openPersonalProfile);
+  $('#personal-settings').addEventListener('close', () => {
+    if (profileReturnFocus?.isConnected && profileReturnFocus.getClientRects().length) profileReturnFocus.focus({preventScroll:true});
+    profileReturnFocus = null;
   });
-  $('#personal-settings-cancel').addEventListener('click', () => { otherDraftForms.delete('personal-settings-form'); fillPersonalSettingsForm(); window.LifeUI.closeSheet($('#personal-settings')); });
+  $('#personal-settings').addEventListener('cancel', () => {
+    if (otherDraftForms.has('personal-settings-form')) toast('资料草稿已保留，再次编辑可继续');
+  });
+  $('#personal-settings').addEventListener('keydown', event => {
+    if(event.key!=='Tab')return;
+    const controls=[...$('#personal-settings').querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]')].filter(node=>node.getClientRects().length);
+    const first=controls[0],last=controls.at(-1);
+    if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  });
+  $('#personal-settings-cancel').addEventListener('click', () => {
+    otherDraftForms.delete('personal-settings-form'); fillPersonalSettingsForm(); profileStatus('');
+    window.LifeUI.closeSheet($('#personal-settings'));
+  });
   $('#personal-settings-form').addEventListener('submit', (event) => {
     event.preventDefault();
-    const next = clonePersonalData();
-    next.profile = {
-      nickname: $('#profile-nickname-input').value.trim(),
-      identity: $('#profile-identity-input').value.trim(),
-      goal: $('#profile-goal-input').value.trim(),
-      motto: $('#profile-motto-input').value.trim(),
-    };
-    const targetValue = $('#wealth-target-input').value;
-    next.wealthTarget = targetValue ? Number(targetValue) : null;
-    if (commitPersonalData(next)) { otherDraftForms.delete('personal-settings-form'); window.LifeUI.closeSheet($('#personal-settings')); toast('个人设置已保存'); }
+    if (profileSavePending) return;
+    profileSavePending = true; window.LifeUI.setBusy($('#personal-profile-save'), true);
+    try {
+      const next = clonePersonalData();
+      next.profile = { nickname:$('#profile-nickname-input').value.trim(), identity:$('#profile-identity-input').value.trim(),
+        goal:$('#profile-goal-input').value.trim(), motto:$('#profile-motto-input').value.trim() };
+      const target = $('#wealth-target-input').value; next.wealthTarget = target ? Number(target) : null;
+      const error = validatePersonalData(next);
+      if (error) { profileStatus(error, true); return; }
+      if (commitPersonalData(next)) {
+        otherDraftForms.delete('personal-settings-form'); profileStatus('资料已保存'); render();
+        window.LifeUI.closeSheet($('#personal-settings')); toast('个人资料已保存 · 仅此浏览器');
+      } else profileStatus('未能保存。请检查浏览器存储空间或其他页面的更新；输入仍保留，可核对后重试。', true);
+    } finally {
+      queueMicrotask(() => { profileSavePending = false; window.LifeUI.setBusy($('#personal-profile-save'), false); });
+    }
   });
 
   $('#daily-record-date').addEventListener('change', (event) => fillDailyRecordForm(event.target.value || selectedDate()));
@@ -1942,6 +2219,9 @@
 
   $('#backup-export').addEventListener('click', () => exportBackup(false));
   $('#backup-export-full').addEventListener('click', () => exportBackup(true));
+  $('#backup-export-schedule').addEventListener('click', () => exportBackup(7));
+  $('#backup-export-learning').addEventListener('click', () => exportBackup(8));
+  $('#backup-before-restore').addEventListener('click', () => exportBackup(8));
   $('#backup-choose').addEventListener('click', () => $('#backup-file').click());
   $('#backup-file').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
@@ -1972,17 +2252,29 @@
     if (type === 'finance') window.LifeUI.closeSheet($('#finance-editor'));
   }));
 
-  $('#task-form').addEventListener('submit', (event) => {
+  $('#task-form').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const id = $('#task-id').value;
-    const existing = data.tasks.find((task) => task.id === id);
-    if (existing) {
-      Object.assign(existing, { date: $('#task-date').value, title: $('#task-title').value.trim(), start: $('#task-start').value, end: $('#task-end').value });
-    } else {
-      data.tasks.push({ id: makeId(), date: $('#task-date').value, title: $('#task-title').value.trim(), start: $('#task-start').value, end: $('#task-end').value, completed: false, createdAt: Date.now() });
-    }
-    if (saveData()) { otherDraftForms.delete('task-form'); populateMonthYears(); resetTaskForm(); render(); toast('任务已保存'); }
-    else { data = loadData(); render(); }
+    if (taskSavePending) return;
+    taskSavePending = true; window.LifeUI.setBusy($('#task-submit'), true);
+    try {
+      const S = window.LifeSchedule, id = $('#task-id').value, existing = data.tasks.find(task => task.id === id);
+      if (id && (!existing || taskEditExpected !== JSON.stringify({ task: existing, detail: S.detailFor(scheduleMeta, id) }))) {
+        window.LifeScheduleUI.formStatus('原日程已变化或不存在，未覆盖。输入保留，请重新核对。'); return;
+      }
+      const task = { ...(existing || { id: makeId(), completed: false, createdAt: Date.now() }), date: $('#task-date').value, title: $('#task-title').value.trim(), start: $('#task-start').value, end: $('#task-end').value };
+      const validation = S.planError(task);
+      if (validation) { window.LifeScheduleUI.formStatus(validation); return; }
+      const overlaps = S.conflicts(task, data.tasks);
+      if (overlaps.length && !await confirmAction('与 ' + overlaps.map(row => row.title).slice(0,3).join('、') + ' 的计划时间重叠。是否仍要保存？', '时间重叠', '仍要保存')) return;
+      const next = S.clone(scheduleMeta), detail = { taskId: task.id, priority: $('#task-priority').value || null, deadline: $('#task-deadline').value || null, note: $('#task-note').value.trim() };
+      const hadDetail = next.taskDetails.some(row => row.taskId === task.id);
+      next.taskDetails = next.taskDetails.filter(row => row.taskId !== task.id);
+      if (hadDetail || detail.priority || detail.deadline || detail.note) next.taskDetails.push(detail);
+      const tasks = existing ? data.tasks.map(row => row.id === task.id ? task : row) : data.tasks.concat(task);
+      const error = saveSchedule({ ...data, tasks }, next);
+      if (error) { window.LifeScheduleUI.formStatus(error); toast(error,true); return; }
+      otherDraftForms.delete('task-form'); populateMonthYears(); resetTaskForm(); render(); toast('日程已保存');
+    } finally { taskSavePending = false; window.LifeUI.setBusy($('#task-submit'), false); }
   });
 
   $('#task-cancel').addEventListener('click', resetTaskForm);
@@ -2022,7 +2314,7 @@
     const closeFinance = event.target.closest('[data-close-finance]');
     if (closeFinance) { window.LifeUI.closeSheet($('#finance-editor')); resetRecordForm('finance'); return; }
     const profile = event.target.closest('[data-open-profile]');
-    if (profile) { if (!otherDraftForms.has('personal-settings-form')) fillPersonalSettingsForm(); $('#personal-settings').showModal(); return; }
+    if (profile) { openPersonalProfile(); return; }
     const link = event.target.closest('[data-open-note], [data-open-goal], [data-open-habit], [data-open-page], a[href="#today-record"]');
     if (link) {
       event.preventDefault();
@@ -2078,32 +2370,44 @@
       beginRecordEdit('finance', target.dataset.editFinance);
     } else if (target.dataset.deleteStudy) {
       if (!await confirmAction('确定删除这条学习记录吗？删除后会从每日和月度学习统计中移除。')) return;
-      data.studies = data.studies.filter((item) => item.id !== target.dataset.deleteStudy);
-      saveData(); render();
+      const nextData = { ...data, studies: data.studies.filter(item => item.id !== target.dataset.deleteStudy) };
+      const error = saveLearning(nextData, window.LifeLearning.reconcile(learningMeta,nextData));
+      if (error) { toast(error,true); return; }
+      render(); toast('学习记录已删除');
     } else if (target.dataset.deleteFinance) {
       const linked = personalData.dailyLogs.some((log) => log.financeRecordId === target.dataset.deleteFinance);
       const message = linked ? '这笔流水来自今日记录。删除会移除流水，保留日报；以后再次保存这篇日报时可能重新生成流水。确认删除吗？' : '确定删除这笔收支流水吗？删除后会从每日和月度收支统计中移除。';
       if (!await confirmAction(message)) return;
       deleteFinanceRecord(target.dataset.deleteFinance);
     } else if (target.dataset.deleteTask) {
-      if (!await confirmAction('确定删除这个工作任务吗？')) return;
-      if ($('#task-id').value === target.dataset.deleteTask) resetTaskForm();
-      data.tasks = data.tasks.filter((item) => item.id !== target.dataset.deleteTask);
-      saveData(); render();
+      if (!await confirmAction('确定删除这项日程吗？重复实例删除后不会因再次生成而恢复。')) return;
+      const id = target.dataset.deleteTask;
+      const error = saveSchedule({ ...data, tasks: data.tasks.filter(item => item.id !== id) }, window.LifeSchedule.removeTask(scheduleMeta, id));
+      if (error) { toast(error,true); return; }
+      if ($('#task-id').value === id) resetTaskForm();
+      render(); toast('日程已删除');
     } else if (target.dataset.editTask) {
       if (otherDraftForms.has('task-form') && !await confirmAction('放弃当前任务草稿并打开所选任务？', '切换任务编辑', '放弃并打开')) return;
       otherDraftForms.delete('task-form');
       const task = data.tasks.find((item) => item.id === target.dataset.editTask);
       if (!task) return;
+      if (location.hash !== '#tasks') openUiPage('#tasks');
+      const details = window.LifeSchedule.detailFor(scheduleMeta, task.id);
+      taskEditExpected = JSON.stringify({ task, detail: details });
       $('#task-id').value = task.id;
       $('#task-date').value = task.date;
       $('#task-title').value = task.title;
       $('#task-start').value = task.start || '';
       $('#task-end').value = task.end || '';
+      $('#task-priority').value = details.priority || '';
+      $('#task-deadline').value = details.deadline || '';
+      $('#task-note').value = details.note;
+      window.LifeScheduleUI.formStatus('');
       $('#task-compose').open = true;
-      $('#task-form-title').textContent = '编辑工作任务';
+      $('#task-form-title').textContent = '编辑日程';
       $('#task-submit').innerHTML = '保存修改 <span><span data-icon="check"></span></span>';
       $('#task-cancel').classList.remove('hidden');
+      $('#task-cancel').textContent = '取消编辑';
       $('#task-title').focus();
     } else if (target.dataset.editNote) {
       beginNoteEdit(target.dataset.editNote);
@@ -2154,9 +2458,13 @@
     }
     const skillSlider = event.target.closest('[data-skill-id]');
     if (skillSlider && SKILL_DEFINITIONS.some((skill) => skill.id === skillSlider.dataset.skillId)) {
+      const skillId=skillSlider.dataset.skillId, hadFocus=document.activeElement===skillSlider;
       const next = clonePersonalData();
-      next.skills[skillSlider.dataset.skillId] = Number(skillSlider.value);
-      commitPersonalData(next);
+      next.skills[skillId] = Number(skillSlider.value);
+      const saved=commitPersonalData(next), status=$('#personal-skill-status');
+      status.textContent=saved ? '技能自评已保存；不会改变实际学习记录。' : '技能未能保存，已显示原有进度。请检查存储或其他页面更新。';
+      status.classList.toggle('is-error',!saved);
+      if(hadFocus) document.querySelector('[data-skill-id="'+skillId+'"]').focus({preventScroll:true});
     }
   });
 
@@ -2368,12 +2676,37 @@
     const progressGroup=$('.personal-growth-grid');
     progressGroup.append($('.skills-details'));
     $('.profile-card').after(progressGroup,$('.personal-shortcuts'));
-    for (const [selector, title, meta, symbol, hint] of [['.growth-panel','成长数据','my-growth-meta','stats','学习时间与连续学习'],['.wealth-panel','财富成长','my-wealth-meta','wallet','收支记录与财富目标']]) {
-      const panel = $(selector), details = document.createElement('details');
-      details.className = 'my-disclosure';
-      details.innerHTML = '<summary class="ui-group-row"><span class="ui-row-icon" data-icon="'+symbol+'"></span><span class="ui-row-copy"><strong>'+title+'</strong><small>'+hint+'</small></span><small class="ui-row-meta" id="'+meta+'"></small><span class="ui-disclosure-icon" aria-hidden="true"><span data-icon="chevronRight"></span></span></summary>';
-      panel.before(details); details.append(panel);
+    const cumulative = document.createElement('details'); cumulative.id='personal-summary-detail'; cumulative.className='personal-summary-detail compose-details';
+    cumulative.innerHTML='<summary>累计数据明细</summary>';
+    $('.personal-shortcuts').after(cumulative);
+    for (const [selector,title,key,symbol,route] of [['.growth-panel','成长数据','growth','stats','#learning'],['.wealth-panel','财富成长','wealth','wallet','#finance']]) {
+      const panel=$(selector), link=document.createElement('a'); link.href=route; link.id='my-'+key+'-entry';
+      link.className='settings-row ui-group-row personal-hub-row';
+      link.innerHTML='<span class="ui-row-icon" data-icon="'+symbol+'"></span><span class="ui-row-copy"><strong>'+title+'</strong><small id="my-'+key+'-sub"></small></span><span class="ui-row-meta" id="my-'+key+'-meta"></span><span class="ui-row-chevron" data-icon="chevronRight"></span>';
+      panel.before(link); cumulative.append(panel);
+      link.addEventListener('click',event=>{
+        if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+        event.preventDefault(); openUiPage(route);
+        if(key==='growth'){
+          $('#selected-date').value=today(); $('#selected-date').dispatchEvent(new Event('change'));
+          window.LifeLearningUI.restore({view:'stats'}); window.LifeLearningUI.render();
+        }else{
+          $('#finance-period').value=today().slice(0,7); $('#finance-period').dispatchEvent(new Event('change'));
+          $('#finance-history-range').value='month'; $('#finance-history-search').value=''; historyPages.finance=1;
+          renderHistory('finance'); renderFinanceOverview();
+        }
+        rememberView();
+      });
     }
+    const growthExtra=document.createElement('p'); growthExtra.id='personal-growth-extra'; growthExtra.className='subtle-copy';
+    $('.growth-panel').append(growthExtra);
+    const streakRule=document.createElement('p'); streakRule.className='subtle-copy'; streakRule.textContent='学习日按有记录的日期去重（含历史0分钟记录）；连续学习截至今天或昨天。计划时长不计入实际学习。'; $('.growth-panel').append(streakRule);
+    const monthCopy=document.createElement('p'); monthCopy.id='personal-finance-month'; monthCopy.className='subtle-copy';
+    $('.wealth-panel').append(monthCopy);
+    const wealthRule=document.createElement('p'); wealthRule.className='subtle-copy'; wealthRule.textContent='累计净结余＝全部收入－全部支出；不同于账户余额或资产总额。财富目标由你手动设置。'; $('.wealth-panel').append(wealthRule);
+    const about=document.createElement('details'); about.id='personal-about'; about.className='personal-about compose-details';
+    about.innerHTML='<summary>关于 Life OS <small>本地网页 · JSON v8</small></summary><p class="subtle-copy">仅在当前浏览器来源保存，没有云端账户同步或自动备份。</p><a class="text-button" href="#settings" data-open-page>查看应用与数据说明</a>';
+    cumulative.after(about);
     $('#home-date-open').addEventListener('click', () => {
       $('#overview-date-slot').append($('.date-control'));
       $('#home-date-dialog').showModal();
@@ -2473,8 +2806,9 @@
         event.preventDefault();
         const date = selectedDate();
         if (card.dataset.homeCard === 'note') { clearIdeaFilters(); $('#diary-filter').value = 'date'; $('#diary-filter-date').value = date; if (!noteFormChanged && !noteEdit) $('#diary-date').value = date; diaryPage = 1; renderDiary(); }
-        if (card.dataset.homeCard === 'study') { $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study = 1; renderHistory('study'); }
+        if (card.dataset.homeCard === 'study') { window.LifeLearningUI.home(); $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study = 1; renderHistory('study'); }
         if (card.dataset.homeCard === 'finance') { $('#finance-period').value = date.slice(0,7); $('#finance-history-anchor').value = date; $('#finance-history-range').value = 'selected'; $('#finance-history-search').value = ''; historyPages.finance = 1; renderHistory('finance'); renderFinanceOverview(); }
+        if (card.dataset.homeCard === 'task') { window.LifeScheduleUI.restore({ view:'day', month:date.slice(0,7), status:'all', scope:'selected' }); renderTasks(data.tasks.filter(task=>task.date===date)); }
         openUiPage(card.getAttribute('href')); return;
       }
       const remove = event.target.closest('[data-remove-note-tag]');
@@ -2497,7 +2831,7 @@
     $('#home-scope-label').textContent = scope + ' · ' + date;
     $('#home-avatar').textContent = Array.from(personalData.profile.nickname.trim())[0] || '我';
     $('#home-nickname').textContent = personalData.profile.nickname.trim() || '我的生活';
-    $('#progress-title').textContent = tasks.length ? scope + '任务' : '暂无任务';
+    $('#progress-title').textContent = tasks.length ? scope + '日程' : '暂无日程';
     $('#task-fraction').textContent = completed + ' / ' + tasks.length;
     const finances = data.finances.filter((item) => item.date === date);
     $('#overview-income').textContent = finances.length ? money(centsTotal(finances, 'income') / 100) : '—';
@@ -2505,9 +2839,6 @@
     $('#overview-balance').textContent = finances.length ? money((centsTotal(finances, 'income') - centsTotal(finances, 'expense')) / 100) : '—';
     $('.today-record-fab').setAttribute('aria-label', date === today() ? '记录今天' : '记录当日');
     $('.today-record-fab').title = date === today() ? '记录今天' : '记录当日';
-    if ($('#my-growth-meta')) $('#my-growth-meta').textContent = data.studies.reduce((sum, row) => sum + row.duration,0) + ' 分钟';
-    if ($('#my-wealth-meta')) $('#my-wealth-meta').textContent = '净积累 ' + money((centsTotal(data.finances,'income') - centsTotal(data.finances,'expense'))/100);
-    $('#my-skills-meta').textContent = SKILL_DEFINITIONS.length + ' 项';
   }
 
   function renderTagDraft() {
@@ -2671,11 +3002,11 @@
     return true;
   }
   function openEntrySource(type,id) {
-    if (type === 'profile') { if (!otherDraftForms.has('personal-settings-form')) fillPersonalSettingsForm(); $('#personal-settings').showModal(); return; }
+    if (type === 'profile') { openPersonalProfile(); return; }
     const row = (type === 'study' ? data.studies : data.finances).find((item) => item.id === id);
     if (!row) { toast('记录已不存在。',true); return; }
     if (type === 'study') {
-      $('#selected-date').value = row.date; $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study=1; render(); openUiPage('#learning');
+      $('#selected-date').value = row.date; $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study=1; window.LifeLearningUI.showRecords(); render(); openUiPage('#learning');
     } else {
       $('#finance-period').value = row.date.slice(0,7); $('#finance-history-anchor').value = row.date; $('#finance-history-range').value = 'selected'; $('#finance-history-search').value = ''; historyPages.finance=1; render(); openUiPage('#finance');
     }
@@ -2707,12 +3038,12 @@
   }
 
   function captureUiView() {
-    const selectors = ['#overview-section', '#diary-list', '#habit-list', '#goal-current-list', '#finance', '#finance .table-wrap', '#task-list', '#global-results', '#finance-detail-list'];
+    const selectors = ['#overview-section', '#diary-list', '#habit-list', '#goal-current-list', '#finance', '#finance .table-wrap', '#task-list', '#global-results', '#finance-detail-list', '#learning-plan-list', '#learning .table-wrap'];
     const scrollers = {};
     selectors.forEach((selector) => { const node = $(selector); if (node) scrollers[selector] = node.scrollTop; });
     const fields = {};
     ['selected-date','diary-filter','diary-filter-date','idea-query','idea-tag-filter','global-query','global-type','global-date','study-history-range','study-history-search','finance-period','insights-anchor','finance-category-type','finance-history-anchor','finance-history-range','finance-history-search','finance-history-start','finance-history-end','study-history-start','study-history-end'].forEach((id) => { if ($('#' + id)) fields[id] = $('#' + id).value; });
-    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, financeBreakdownOpen:$('.finance-breakdown').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>node.open), ideas:window.LifeIdeasUI.snapshot() };
+    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, financeBreakdownOpen:$('.finance-breakdown').open, personalSummaryOpen:$('#personal-summary-detail').open, personalAboutOpen:$('#personal-about').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>Boolean(node.open)), ideas:window.LifeIdeasUI.snapshot(), schedule:window.LifeScheduleUI.snapshot(), learning:window.LifeLearningUI.snapshot() };
   }
 
   function restoreUiView(view) {
@@ -2722,6 +3053,8 @@
     if (typeof view.statisticsOtherOpen === 'boolean') $('.statistics-other').open=view.statisticsOtherOpen;
     if (typeof view.monthlyLegacyOpen === 'boolean') $('#monthly-legacy-detail').open=view.monthlyLegacyOpen;
     Object.entries(view.fields || {}).forEach(([id, value]) => { const field = document.getElementById(id); if (field && typeof value === 'string') field.value = value; });
+    if (view.schedule) window.LifeScheduleUI.restore(view.schedule);
+    if (view.learning) window.LifeLearningUI.restore(view.learning);
     if (!view.fields) {
       if (view.diaryFilter) $('#diary-filter').value = view.diaryFilter;
       if (view.diaryFilterDate) $('#diary-filter-date').value = view.diaryFilterDate;
@@ -2730,7 +3063,9 @@
     searchPage = Number(view.searchPage) || 1;
     if (view.historyPages) Object.assign(historyPages, view.historyPages);
     if (typeof view.financeBreakdownOpen === 'boolean') $('.finance-breakdown').open=view.financeBreakdownOpen;
-    if (Array.isArray(view.personalPanels)) [...$('.personal-growth-grid').children].forEach((node,index)=>{node.open=Boolean(view.personalPanels[index]);});
+    if (Array.isArray(view.personalPanels)) [...$('.personal-growth-grid').children].forEach((node,index)=>{if(node.tagName==='DETAILS')node.open=Boolean(view.personalPanels[index]);});
+    $('#personal-summary-detail').open=typeof view.personalSummaryOpen==='boolean'?view.personalSummaryOpen:Boolean(view.personalPanels?.slice(0,2).some(Boolean));
+    if(typeof view.personalAboutOpen==='boolean')$('#personal-about').open=view.personalAboutOpen;
     if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = selectedDate();
     if (!$('#task-id').value && !otherDraftForms.has('task-form')) $('#task-date').value = selectedDate();
     render();
@@ -2772,7 +3107,10 @@
   }
 
   function syncNavigation(target) {
+    if (learningRouteActive && target !== '#learning' && window.LifeLearning.active(learningMeta)?.status === 'running') toast('专注计时仍在继续，可返回学习暂停或结束');
+    learningRouteActive = target === '#learning';
     target = target || '#overview';
+    if ($('#schedule-repeat-dialog').open && target !== '#tasks') window.LifeUI.closeSheet($('#schedule-repeat-dialog'));
     if ($('#finance-filter-dialog').open && target !== '#finance') $('#finance-filter-dialog').close();
     if ($('#finance-more-dialog').open && target !== '#finance') $('#finance-more-dialog').close();
     if ($('#insights-date-dialog').open && target !== '#monthly') $('#insights-date-dialog').close();
@@ -2810,7 +3148,7 @@
     });
     const routeBackbar = $('#route-backbar');
     $('.today-record-fab').classList.toggle('hidden', target !== '#overview');
-    const routeTitle = financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '工作计划', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '任务详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
+    const routeTitle = financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '日程', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '日程详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
     const showRouteBack = !['#overview', '#records', '#finance', '#monthly', '#personal', '#bill/new'].includes(target);
     routeBackbar.classList.toggle('hidden', !showRouteBack);
     $('#route-back-title').textContent = routeTitle;
@@ -2937,7 +3275,8 @@
 
   $('#month-month').value = String(new Date().getMonth() + 1).padStart(2, '0');
   populateMonthYears();
-  const startingDate = isValidDate(history.state?.homeDate) ? history.state.homeDate : today();
+  const directTask = data.tasks.find(task => task.id === taskIdFromRoute());
+  const startingDate = isValidDate(history.state?.viewSnapshot?.fields?.['selected-date']) ? history.state.viewSnapshot.fields['selected-date'] : isValidDate(history.state?.homeDate) ? history.state.homeDate : directTask?.date || today();
   setFormDates(startingDate);
   $('#finance-period').value = today().slice(0, 7);
   $('#finance-history-anchor').value = today();
@@ -2968,6 +3307,22 @@
       const rows=window.LifeIdeasUI.entries(personalData.diary);diaryPage=Math.floor(Math.max(0,rows.findIndex(n=>n.id===id))/10)+1;
       $('#diary-list').scrollTop=0;if(filtered)toast('妙想已保存 · 已清除列表条件以显示新记录');
     },
+  });
+  window.LifeScheduleUI.init({
+    date:selectedDate, today, makeId, meta:()=>scheduleMeta, refresh:render, remember:rememberView,
+    chooseDate:date=>{
+      if (!isValidDate(date)) return;
+      $('#selected-date').value=date; $('#selected-date').dispatchEvent(new Event('change'));
+      history.replaceState({ ...(history.state || {}), homeDate:date }, '', location.href); rememberView();
+    },
+    saveSeries:saveScheduleSeries, generate:generateScheduleSeries, toggleSeries:toggleScheduleSeries,
+    confirm:confirmAction, hasDraft:id=>otherDraftForms.has(id), clearDraft:id=>otherDraftForms.delete(id),
+  });
+  window.LifeLearningUI.init({
+    date:selectedDate, today, read:()=>({data,meta:learningMeta,schedule:scheduleMeta}), remember:rememberView,
+    chooseDate:date=>{if (isValidDate(date)) {$('#selected-date').value=date;$('#selected-date').dispatchEvent(new Event('change'));}},
+    goal:saveLearningGoal, plan:saveLearningPlan, archive:archiveLearningPlan, focus:focusAction, newRecord:newLearningRecord,
+    confirm:confirmAction, toast, open:openUiPage, hasDraft:id=>otherDraftForms.has(id), clearDraft:id=>otherDraftForms.delete(id), markDraft:id=>otherDraftForms.add(id),
   });
   $('#finance-month-open').addEventListener('click',openFinanceMonth);
   $('#finance-month-cancel').addEventListener('click',()=>closeFinanceMonth(false));

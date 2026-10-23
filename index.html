@@ -20,6 +20,10 @@
   <script src="finance-views.js" defer></script>
   <script src="finance-ledger.js" defer></script>
   <script src="ideas-ui.js" defer></script>
+  <script src="schedule.js" defer></script>
+  <script src="schedule-ui.js" defer></script>
+  <script src="learning.js" defer></script>
+  <script src="learning-ui.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -65,7 +69,7 @@
           <a class="home-card" href="#learning" data-home-card="study"><span class="home-card-title">学习 </span><span class="home-main-value"><strong id="overview-study">0</strong><small>分钟</small></span><span class="home-card-sub" id="overview-study-sub"></span></a>
           <a class="home-card" href="#daily-notes" data-home-card="note"><span class="home-card-title">妙想 </span><span class="home-main-value"><strong id="overview-notes">0</strong><small>条</small></span><span class="home-card-sub note-card-preview" id="overview-note-preview"></span></a>
           <a class="home-card home-money" href="#finance" data-home-card="finance"><span class="home-card-title">收支 </span><span class="home-money-pair"><span><small>支出 · USD</small><strong id="overview-expense">—</strong></span><span><small>收入 · USD</small><strong id="overview-income">—</strong></span></span><span class="home-balance"><small>差额</small><strong id="overview-balance">—</strong></span></a>
-          <a class="home-card" href="#tasks" data-home-card="task"><span class="home-card-title">任务 </span><span class="home-main-value"><strong id="task-fraction">0 / 0</strong><small>已完成</small></span><span class="home-task-line"><span id="progress-title"></span><strong id="completion-percent">0%</strong></span><span class="task-progress-track"><span id="task-progress-bar"></span></span></a>
+          <a class="home-card" href="#tasks" data-home-card="task"><span class="home-card-title">日程 </span><span class="home-main-value"><strong id="task-fraction">0 / 0</strong><small>已完成</small></span><span class="home-task-line"><span id="progress-title"></span><strong id="completion-percent">0%</strong></span><span class="task-progress-track"><span id="task-progress-bar"></span></span></a>
         </nav>
         <a class="today-record-fab" href="#today-record" data-quick-launch aria-label="快速记录今天" title="快速记录今天" aria-haspopup="dialog" aria-expanded="false"><span data-icon="edit"></span></a>
       </section>
@@ -76,7 +80,7 @@
         <div id="quick-record-choices" class="quick-record-choices" aria-label="选择记录类型">
           <button type="button" data-quick-kind="study"><span class="quick-choice-icon" data-icon="study"></span><span><strong>学习</strong><small>内容与时长</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
           <button type="button" data-quick-kind="finance"><span class="quick-choice-icon" data-icon="finance"></span><span><strong>收入 / 支出</strong><small>金额、分类与备注</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
-          <button type="button" data-quick-kind="task"><span class="quick-choice-icon" data-icon="task"></span><span><strong>任务</strong><small>添加一项工作计划</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
+          <button type="button" data-quick-kind="task"><span class="quick-choice-icon" data-icon="task"></span><span><strong>日程</strong><small>添加一项计划或待办</small></span><b aria-hidden="true"><span data-icon="chevronRight"></span></b></button>
         </div>
         <form id="quick-record-form" class="quick-record-form hidden" novalidate>
           <button class="quick-sheet-back" id="quick-record-back" type="button"><span aria-hidden="true"><span data-icon="back"></span></span> 记录类型</button>
@@ -106,14 +110,14 @@
           <a href="#habits"><span>习惯</span><small>查看完成情况</small><b aria-hidden="true"><span data-icon="chevronRight"></span></b></a>
           <a href="#goals"><span>长期目标</span><small>查看时间线与进度</small><b aria-hidden="true"><span data-icon="chevronRight"></span></b></a>
         </nav>
-        <nav class="record-secondary-links" aria-label="更多记录页面"><a href="#learning"><span>学习详情</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#tasks"><span>工作计划</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#today-record" data-open-page><span>完整今日回顾</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a></nav>
+        <nav class="record-secondary-links" aria-label="更多记录页面"><a href="#learning"><span>学习</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#tasks"><span>日程</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a><a href="#today-record" data-open-page><span>完整今日回顾</span><span aria-hidden="true"><span data-icon="chevronRight"></span></span></a></nav>
       </section>
       <section class="page-section" id="daily-notes-section"><div class="section-heading"><div><h2>妙想</h2><p class="page-description">留下每天值得记住的事情。</p></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="daily-notes-slot"></div><article class="panel note-detail hidden" id="note-detail" aria-live="polite"></article></section>
       <section class="page-section" id="habits-section"><div class="section-heading"><div><h2>习惯打卡</h2></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="habits-slot"></div></section>
       <section class="page-section" id="goals-section"><div class="section-heading"><div><h2>长期目标</h2></div><a class="text-link" href="#records"><span data-icon="back"></span> 记录中心</a></div><div id="goals-slot"></div><article class="panel goal-detail hidden" id="goal-detail" aria-live="polite"></article></section>
 
       <section class="page-section" id="today-record">
-        <div class="record-page-heading"><div><button class="record-return" id="daily-record-back" type="button"><span data-icon="back"></span> 返回</button><p class="eyebrow">每天几分钟</p><h2>记录今天</h2></div><nav class="record-shortcuts" aria-label="记录相关页面"><a href="#learning">学习详情 <span data-icon="chevronRight"></span></a><a href="#tasks">工作计划 <span data-icon="chevronRight"></span></a></nav></div>
+        <div class="record-page-heading"><div><button class="record-return" id="daily-record-back" type="button"><span data-icon="back"></span> 返回</button><p class="eyebrow">每天几分钟</p><h2>记录今天</h2></div><nav class="record-shortcuts" aria-label="记录相关页面"><a href="#learning">学习 <span data-icon="chevronRight"></span></a><a href="#tasks">日程 <span data-icon="chevronRight"></span></a></nav></div>
         <article class="panel daily-record-panel">
           <form id="daily-record-form" class="daily-record-form">
             <div class="daily-core-grid">
@@ -139,16 +143,18 @@
       <section class="page-section" id="personal">
         <div class="section-heading personal-heading"><div><h2 class="sr-only">我的</h2></div></div>
         <div class="personal-data-status" id="personal-data-status" role="status" aria-live="polite"></div>
-        <nav class="personal-shortcuts ui-group-card" aria-label="设置与数据管理"><a class="settings-row ui-group-row" href="#settings" data-open-page><span class="ui-row-icon" data-icon="profile"></span><span class="ui-row-copy"><strong>个人资料与偏好</strong><small>管理个人信息与现有设置</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#backup" data-open-page><span class="ui-row-icon" data-icon="export"></span><span class="ui-row-copy"><strong>数据备份</strong><small>导出、检查与安全恢复</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a></nav>
+        <nav class="personal-shortcuts ui-group-card" aria-label="设置与数据管理"><a class="settings-row ui-group-row" href="#settings" data-open-page><span class="ui-row-icon" data-icon="profile"></span><span class="ui-row-copy"><strong>个人资料与偏好</strong><small>资料、固定规则与本地说明</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#backup" data-open-page><span class="ui-row-icon" data-icon="export"></span><span class="ui-row-copy"><strong>数据备份</strong><small>完整 JSON v8 · 手动导出与恢复</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a></nav>
 
         <dialog class="panel personal-settings" id="personal-settings" aria-labelledby="personal-settings-title">
-          <div class="panel-heading"><div><h3 id="personal-settings-title">个人设置</h3><p>更新个人资料和财富目标</p></div></div>
+          <div class="panel-heading"><div><h3 id="personal-settings-title">个人资料</h3><p>更新个人资料和财富目标</p></div></div>
           <form class="form-stack personal-settings-form" id="personal-settings-form">
+            <p class="personal-local-note">资料仅保存在当前浏览器，不是云端账户。头像沿用昵称首字。</p>
             <div class="form-row"><label>昵称<input id="profile-nickname-input" type="text" maxlength="40" placeholder="填写你希望显示的昵称"></label><label>身份<input id="profile-identity-input" type="text" maxlength="60" placeholder="例如：自由职业者、学生"></label></div>
             <label>个人目标<input id="profile-goal-input" type="text" maxlength="120" placeholder="例如：建立稳定的学习和储蓄习惯"></label>
             <label>座右铭<input id="profile-motto-input" type="text" maxlength="160" placeholder="写下一句提醒自己的话"></label>
-            <label>财富目标 <span class="label-hint">USD</span><input id="wealth-target-input" type="number" min="0.01" step="0.01" placeholder="例如：10000"></label>
-            <div class="form-row"><button class="primary-button" type="submit">保存设置</button><button class="secondary-button" id="personal-settings-cancel" type="button">取消修改</button></div>
+            <label><span>财富目标 <span class="label-hint">USD</span></span><input id="wealth-target-input" type="number" min="0.01" step="0.01" placeholder="例如：10000"></label>
+            <p id="personal-profile-status" class="record-form-status" role="status" aria-live="polite"></p>
+            <div class="form-row"><button class="primary-button" id="personal-profile-save" type="submit">保存资料</button><button class="secondary-button" id="personal-settings-cancel" type="button">取消修改</button></div>
           </form>
         </dialog>
 
@@ -163,14 +169,14 @@
             <div class="growth-metrics"><div><strong id="personal-study-minutes">0</strong><span>学习总分钟</span></div><div><strong id="personal-study-days">0</strong><span>学习天数</span></div><div><strong id="personal-study-streak">0</strong><span>连续学习天数</span></div></div>
           </article>
           <article class="panel wealth-panel"><div class="panel-heading"><div><p class="eyebrow">稳步积累</p><h3>财富成长</h3></div><span class="soft-badge">美元 USD</span></div>
-            <div class="wealth-metrics"><div><span>累计收入</span><strong class="money-in" id="personal-income">$0.00</strong></div><div><span>累计支出</span><strong class="money-out" id="personal-expense">$0.00</strong></div><div><span>净积累</span><strong id="personal-net-worth">$0.00</strong></div></div>
+            <div class="wealth-metrics"><div><span>累计收入</span><strong class="money-in" id="personal-income">—</strong></div><div><span>累计支出</span><strong class="money-out" id="personal-expense">—</strong></div><div><span>累计净结余</span><strong id="personal-net-worth">—</strong></div></div>
             <div class="wealth-progress-copy"><span id="wealth-progress-label">请在个人设置中填写财富目标</span><strong id="wealth-progress-percent">0%</strong></div><div class="wealth-progress-track"><span id="wealth-progress-bar"></span></div>
           </article>
         </div>
 
         <details class="skills-details">
-          <summary class="ui-group-row"><span class="ui-row-icon" data-icon="skills"></span><span class="ui-row-copy"><strong>技能进度</strong><small>学习与技能提升</small></span><small class="ui-row-meta" id="my-skills-meta"></small><span class="ui-disclosure-icon" aria-hidden="true"><span data-icon="chevronRight"></span></span></summary>
-          <article class="panel skills-panel"><div class="panel-heading"><div><h3>持续成长</h3><p>更新各项技能的自我评估。</p></div></div><div class="skills-tree" id="personal-skills"></div></article>
+          <summary class="ui-group-row"><span class="ui-row-icon" data-icon="skills"></span><span class="ui-row-copy"><strong>技能进度</strong><small>手动记录与调整</small></span><small class="ui-row-meta" id="my-skills-meta"></small><span class="ui-disclosure-icon" aria-hidden="true"><span data-icon="chevronRight"></span></span></summary>
+          <article class="panel skills-panel"><div class="panel-heading"><div><h3>技能自评</h3><p>五项既有技能的手动进度，不由学习次数推断掌握程度。</p></div></div><div class="skills-tree" id="personal-skills"></div><p id="personal-skill-status" class="record-form-status" role="status"></p></article>
         </details>
 
         <div class="personal-columns">
@@ -258,16 +264,16 @@
 
       <section class="page-section" id="work-plan-section">
         <div id="task-list-view">
-          <form class="quick-task-form" id="quick-task-form"><label class="sr-only" for="quick-task-title">快速添加任务</label><input id="quick-task-title" type="text" maxlength="120" placeholder="添加当天任务" required><button class="secondary-button" type="submit">添加任务</button></form>
-          <div class="section-heading"><div><p class="eyebrow">安排好每一步</p><h2>今日工作计划</h2><p class="page-description">添加任务、安排时间，并在完成后勾选。</p></div><div class="section-total"><span>所选日期完成情况</span><strong id="task-total">0 / 0 项</strong></div></div>
+          <form class="quick-task-form" id="quick-task-form"><label class="sr-only" for="quick-task-title">快速添加任务</label><input id="quick-task-title" type="text" maxlength="120" placeholder="快速添加待办" required><button class="secondary-button" type="submit">添加任务</button></form>
+          <div class="section-heading"><div><p class="eyebrow">安排好每一步</p><h2>今日安排</h2><p class="page-description">按计划时间查看安排，未定时间保留为待办。</p></div><div class="section-total"><span>所选日期完成情况</span><strong id="task-total">0 / 0 项</strong></div></div>
           <div class="content-grid tasks-grid">
-            <article class="panel form-panel"><div class="panel-heading"><div><h3 id="task-form-title">添加工作任务</h3><p>可以设置计划开始和结束时间</p></div></div>
+            <article class="panel form-panel"><div class="panel-heading"><div><h3 id="task-form-title">添加日程</h3><p>可以设置计划开始和结束时间</p></div></div>
               <form id="task-form" class="form-stack">
                 <input id="task-id" type="hidden">
                 <label>日期<input id="task-date" type="date" required></label>
                 <label>任务内容<input id="task-title" type="text" maxlength="120" placeholder="例如：整理本周工作安排" required></label>
                 <div class="form-row"><label>开始时间<input id="task-start" type="time"></label><label>结束时间<input id="task-end" type="time"></label></div>
-                <div class="form-actions"><button class="primary-button full-button" id="task-submit" type="submit">添加任务 <span><span data-icon="add"></span></span></button><button class="secondary-button full-button hidden" id="task-cancel" type="button">取消编辑</button></div>
+                <div class="form-actions"><button class="primary-button full-button" id="task-submit" type="submit">添加任务 <span><span data-icon="add"></span></span></button><button class="secondary-button full-button" id="task-cancel" type="button">清空草稿</button></div>
               </form>
             </article>
             <article class="panel table-panel task-panel"><div class="panel-heading"><div><h3>任务清单</h3><p>完成一项，就勾选一项</p></div><span class="soft-badge" id="task-badge">0 项任务</span></div>
@@ -287,7 +293,7 @@
           <article class="task-detail-content">
             <p class="task-detail-date" id="task-detail-date"></p>
             <h2 id="task-detail-title">任务详情</h2>
-            <div class="task-detail-meta"><span id="task-detail-time"></span><span id="task-detail-status"></span></div>
+            <div class="task-detail-meta"><span id="task-detail-time"></span><span id="task-detail-status"></span></div><div id="task-detail-extra"></div><div class="schedule-detail-actions" id="task-detail-actions"></div>
           </article>
         </div>
       </section>
@@ -311,13 +317,14 @@
         </article>
       </section>
       <section class="page-section" id="backup">
+        <p id="backup-session-info" class="subtle-copy" role="status">尚未记录本次会话的导出操作。不会推测以前的备份时间。</p>
         <button class="page-back" type="button" data-back-fallback="#settings"><span data-icon="back"></span> 返回设置</button>
         <div class="section-heading"><div><p class="eyebrow">让生活系统贴合自己</p><h2>数据备份</h2><p class="page-description">管理个人资料，并导出或安全合并你的学习、收支和工作记录。</p></div></div>
         <div class="backup-grid">
           <article class="panel backup-panel">
-            <div class="backup-icon" data-icon="export"></div><div class="panel-heading"><div><h3>导出备份</h3><p>选择兼容备份，或包含财务扩展的完整备份</p></div></div>
-            <ul class="backup-includes"><li>全部学习记录</li><li>全部收入与支出记录</li><li>全部工作任务及完成状态</li><li>每日记录和个人空间</li><li>查看日期和统计筛选设置</li></ul>
-            <button class="primary-button" id="backup-export" type="button">导出兼容 JSON v5</button><button class="secondary-button" id="backup-export-full" type="button">导出完整 JSON v6</button><p class="subtle-copy" id="backup-extension-note">v5 不含自选分类图标、预算和资产；完整备份请选择 v6。</p>
+            <div class="backup-icon" data-icon="export"></div><div class="panel-heading"><div><h3>导出备份</h3><p>保留旧版格式，或选择包含全部扩展的 v8</p></div></div>
+            <p class="subtle-copy">文件下载由浏览器完成；本站不会自动备份或上传你的数据。</p><ul class="backup-includes"><li>全部学习记录</li><li>全部收入与支出记录</li><li>全部工作任务及完成状态</li><li>每日记录和个人空间</li><li>查看日期和统计筛选设置</li></ul>
+            <button class="primary-button" id="backup-export-learning" type="button">导出完整 JSON v8</button><button class="secondary-button" id="backup-export" type="button">导出兼容 JSON v5</button><button class="secondary-button" id="backup-export-full" type="button">导出财务 JSON v6</button><button class="secondary-button" id="backup-export-schedule" type="button">导出日程 JSON v7</button><p class="subtle-copy" id="backup-extension-note">v8 包含学习、收支、日程、个人空间和全部扩展。v5/v6/v7 保留兼容用途，不含学习扩展；运行计时仅在导出副本中暂停，恢复后手动继续。</p>
           </article>
           <article class="panel backup-panel">
             <div class="backup-icon restore-icon" data-icon="restore"></div><div class="panel-heading"><div><h3>导入并恢复</h3><p>选择之前导出的 JSON 文件，检查摘要后确认合并</p></div></div>
@@ -341,7 +348,7 @@
             <div><span>账单分类关联</span><strong id="backup-assignment-count">0</strong></div>
             <div><span>相同记录（将跳过）</span><strong id="backup-duplicate-count">0</strong></div>
           </div>
-          <p id="backup-meta-summary" class="subtle-copy"></p>
+          <div class="backup-safety-action"><button class="secondary-button" id="backup-before-restore" type="button">先导出当前完整数据</button><span class="subtle-copy">建议确认下载保存后，再合并恢复。</span></div><p id="backup-learning-summary" class="subtle-copy"></p><p id="backup-schedule-summary" class="subtle-copy"></p><p id="backup-meta-summary" class="subtle-copy"></p>
           <p class="backup-import-plan" id="backup-import-plan"></p>
           <p class="backup-exported-at" id="backup-exported-at"></p>
           <p class="backup-conflict hidden" id="backup-conflict"></p>
@@ -380,9 +387,9 @@
         <button class="page-back" type="button" data-back-fallback="#personal"><span data-icon="back"></span> 返回我的</button>
         <div class="section-heading"><h2>设置</h2></div>
         <section class="settings-group"><h3>个人</h3><div class="settings-list"><button class="settings-row" type="button" data-open-profile><span>个人资料与财富目标</span><span>编辑 <span data-icon="chevronRight"></span></span></button></div></section>
-        <section class="settings-group"><h3>应用</h3><div class="settings-list"><div class="settings-row"><span>外观</span><span>黑白灰 · 默认</span></div><a class="settings-row" href="#categories" data-open-page><span>收支分类</span><span>管理 <span data-icon="chevronRight"></span></span></a></div></section>
-        <section class="settings-group"><h3>数据</h3><div class="settings-list"><a class="settings-row" href="#backup" data-open-page><span>导出与备份恢复</span><span>JSON <span data-icon="chevronRight"></span></span></a></div></section>
-        <section class="settings-group"><h3>关于</h3><div class="settings-list"><div class="settings-row"><span>版本</span><span>本地版 · JSON v5 / v6</span></div><div class="settings-row"><span>保存位置</span><span>当前设备的浏览器</span></div></div></section>
+        <section class="settings-group"><h3>当前规则</h3><dl class="personal-settings-facts"><div><dt>货币</dt><dd>USD · 固定美元</dd></div><div><dt>外观</dt><dd>浅色 · 黑白灰</dd></div><div><dt>周起始日</dt><dd>周一</dd></div><div><dt>提醒</dt><dd>尚未提供通知机制</dd></div></dl><p class="subtle-copy">当前规则不是可切换偏好。货币符号不会被替换为人民币，也不会重解释历史金额。</p><div class="settings-list"><a class="settings-row" href="#categories" data-open-page><span>收支分类</span><span>管理 <span data-icon="chevronRight"></span></span></a></div></section>
+        <section class="settings-group"><h3>数据</h3><div class="settings-list"><a class="settings-row" href="#backup" data-open-page><span>导出与备份恢复</span><span>完整 JSON v8 <span data-icon="chevronRight"></span></span></a></div></section>
+        <section class="settings-group"><h3>关于 Life OS</h3><dl class="personal-settings-facts"><div><dt>应用版本</dt><dd>本地网页 · 未设独立版本号</dd></div><div><dt>数据格式</dt><dd>完整 v8 · 可恢复 v1–v8</dd></div><div><dt>运行方式</dt><dd>浏览器网页 · 暂无 PWA 安装</dd></div></dl><p class="personal-local-note">数据保存在当前浏览器来源中，没有云端账户同步。更换地址、端口、浏览器或设备前，请先导出完整 JSON。这里的导出是手动文件下载，不是自动备份。</p></section>
       </section>
       <section class="page-section" id="habit-detail-section"><article id="habit-detail" class="habit-detail"></article></section>
       <section class="page-section" id="search-section">
