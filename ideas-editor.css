@@ -1,0 +1,53 @@
+/* Scoped overrides also contain the local Quill vendor styles. */
+body.ideas-view #route-back-button { min-width:44px; width:44px; padding:0; justify-content:center; }
+body.ideas-view #route-back-button>span:last-child { display:none; }
+body.ideas-view #diary-empty.idea-inline-empty { padding:20px 4px; min-height:0; margin:0; text-align:left; font-size:14px; color:var(--text-secondary); background:transparent; border:0; box-shadow:none; }
+.ideas-view .idea-tag,.ideas-compose-dialog .idea-tag,#ideas-compose-dialog #idea-tags-toggle { color:#7654a3; }
+.idea-card-content p,.note-detail-content p { margin:0 0 .4em; }
+.idea-card-content ol,.note-detail-content ol { margin:.4em 0; padding-left:1.5em; }
+.idea-card-content img,.note-detail-content img { display:block; width:100%; height:auto; max-width:100%; max-height:420px; object-fit:contain; border-radius:12px; margin:8px 0; }
+.rich-conflict { display:block; font-weight:400; color:var(--text-secondary); }
+#ideas-compose-dialog { width:min(680px,calc(100% - 16px)); padding:8px 12px max(8px,env(safe-area-inset-bottom)); border:1px solid var(--border); border-radius:28px; background:var(--surface); box-shadow:var(--shadow-floating); max-height:calc(var(--ideas-viewport-height,100dvh) - 20px); bottom:calc(var(--ideas-keyboard-inset,0px) + 8px) !important; overflow:hidden; }
+#ideas-compose-dialog[open] { display:flex; flex-direction:column; }
+#ideas-compose-dialog::before { display:none; }
+#ideas-compose-back { border:0; background:transparent; box-shadow:none; }
+#ideas-compose-dialog .idea-legacy-field { display:none !important; }
+.idea-editor-head { display:flex; align-items:center; flex:0 0 44px; position:relative; touch-action:pan-x; }
+.idea-editor-head .idea-drag-handle { position:absolute; width:42px; height:5px; border-radius:4px; background:var(--border); left:50%; top:7px; transform:translateX(-50%); }
+#ideas-compose-dialog #diary-compose { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+#ideas-compose-dialog #diary-form { min-height:0; height:100%; display:flex; flex-direction:column; gap:6px; overflow:hidden; }
+#idea-rich-editor { flex:1 1 auto; min-height:130px; height:min(38dvh,330px); font:inherit; border:0; overflow:auto; overscroll-behavior:contain; }
+#idea-rich-editor .ql-editor { padding:10px 8px; min-height:130px; font-size:17px; line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
+#idea-rich-editor .ql-editor.ql-blank::before { left:8px; right:8px; font-style:normal; color:var(--text-tertiary); }
+#idea-rich-editor .ql-editor:focus-visible { outline:0; }
+#idea-rich-editor .ql-editor ol { padding-left:1.5em; }
+#idea-rich-editor .idea-image-embed { position:relative; display:block; margin:12px 0; }
+#idea-rich-editor .idea-image-embed img { display:block; max-width:100%; max-height:240px; object-fit:contain; border-radius:12px; }
+#idea-rich-editor .idea-image-remove { position:absolute; right:4px; top:4px; background:var(--surface); border:1px solid var(--border); }
+.idea-editor-controls { flex:0 0 auto; padding-top:4px; }
+.idea-tools { display:grid; grid-template-columns:repeat(6,minmax(44px,1fr)); gap:2px; align-items:center; }
+.idea-more-tools { grid-template-columns:repeat(5,minmax(44px,1fr)); margin-bottom:6px; padding:4px; border-radius:24px; background:var(--surface-muted); }
+.idea-tools[hidden],#idea-ocr-panel[hidden] { display:none; }
+.idea-tools button { min-width:44px; min-height:44px; padding:0; display:grid; place-items:center; font-size:22px; border:0; background:transparent; box-shadow:none; border-radius:16px; }
+.idea-tools button[aria-pressed=true] { background:var(--surface-muted); color:var(--text-primary); box-shadow:inset 0 0 0 1px var(--border); }
+#ideas-compose-dialog .idea-send { margin:0; background:var(--text-primary); color:var(--surface); border-radius:50%; width:44px; justify-self:end; }
+#idea-selected-tags { flex:0 0 auto; max-height:56px; overflow:auto; }
+#ideas-compose-dialog #idea-tags-editor { position:absolute; z-index:2; left:12px; right:12px; bottom:130px; max-height:min(160px,35dvh); overflow:auto; padding:8px; border:1px solid var(--border); border-radius:16px; background:var(--surface); box-shadow:var(--shadow-subtle); }
+#ideas-compose-dialog #idea-tag-input { min-width:0; }
+#idea-status { flex:0 0 auto; margin:0; padding:0 6px; min-height:16px; font-size:12px; line-height:1.4; max-height:42px; overflow:auto; color:var(--text-secondary); }
+#idea-status.is-error { color:var(--danger); }
+.idea-auxiliary { flex:0 0 auto; }
+.idea-auxiliary:has(#idea-ocr-panel:not([hidden])) { position:absolute; z-index:3; top:56px; left:12px; right:12px; bottom:130px; display:flex; }
+#idea-ocr-panel { padding:8px; background:var(--surface-muted); border-radius:16px; max-height:200px; overflow:auto; }
+.idea-auxiliary:has(#idea-ocr-panel:not([hidden])) #idea-ocr-panel { max-height:none; flex:1; min-height:0; }
+#idea-ocr-panel p { margin:4px; font-size:14px; }
+#idea-ocr-panel textarea { min-height:70px; font-size:16px; }
+#idea-ocr-panel>div { position:sticky; bottom:0; background:var(--surface-muted); display:flex; justify-content:space-between; gap:8px; }
+.idea-more-tools:not([hidden]) { animation:idea-tools-in var(--motion-fast) var(--ease-standard); }
+@keyframes idea-tools-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.idea-tools button:active { transform:scale(.96); }
+.idea-tools button:focus-visible { outline:2px solid var(--text-primary); outline-offset:-2px; }
+@media(max-width:760px) { body.ideas-view #daily-notes-section:not(:has(#note-detail:not(.hidden))) { height:calc(100dvh - var(--nav-clearance) - var(--safe-top) - 150px); } body.ideas-search-view #daily-notes-section:not(:has(#note-detail:not(.hidden))) { height:calc(100dvh - var(--nav-clearance) - var(--safe-top) - 78px); } }
+@media(max-height:600px) { #idea-rich-editor { height:150px; min-height:72px; } #idea-rich-editor .ql-editor { min-height:72px; } #ideas-compose-dialog { max-height:calc(var(--ideas-viewport-height,100dvh) - 8px); } }
+@media(max-height:400px) { #idea-rich-editor,#idea-rich-editor .ql-editor { min-height:48px; } #idea-selected-tags { max-height:32px; } }
+@media(prefers-reduced-motion:reduce) { .idea-tools button { transition:none; } .idea-more-tools { animation:none !important; } .idea-tools button:active { transform:none; } }

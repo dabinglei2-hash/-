@@ -36,7 +36,9 @@
       return (!start || item.date >= start) && (!end || item.date <= end)
         && (!query || String(text || '').toLocaleLowerCase().includes(query));
     }).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-    const pageSize = 10;
+    // Continuous finance lists use the exact same query, ordering and totals.
+    // Learning and older callers keep their ten-record pagination.
+    const pageSize = options.paginate === false ? Math.max(1, matches.length) : 10;
     const pages = Math.max(1, Math.ceil(matches.length / pageSize));
     const page = Math.min(pages, Math.max(1, Math.floor(Number(options.page) || 1)));
     const totals = matches.reduce((sum, item) => {

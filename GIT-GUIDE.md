@@ -1,6 +1,8 @@
 # 网站代码的 Git 使用说明
 
-本地项目：`D:\CODEX\gerenshenghuoguanliwangzhan`
+本地项目：`D:\CODEX\Life OS`。旧路径 `D:\CODEX\gerenshenghuoguanliwangzhan` 是指向同一份文件的兼容入口；不要当成重复副本清理。
+
+当前备份标签：`v0.2.0-backup-2026-10-26`；完整提交和恢复步骤见 [VERSION_HISTORY](docs/VERSION_HISTORY.md)。本文件的手动操作示例仍需先检查提交范围，排除凭据和浏览器个人数据。
 
 GitHub 私有仓库：https://github.com/dabinglei2-hash/-
 
@@ -9,7 +11,7 @@ GitHub 私有仓库：https://github.com/dabinglei2-hash/-
 ## 1. 打开终端，进入项目
 
 ```powershell
-cd "D:\CODEX\gerenshenghuoguanliwangzhan"
+cd "D:\CODEX\Life OS"
 git status
 ```
 

@@ -7,8 +7,11 @@
   <title>我的生活管理台</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="workspace.css">
+  <link rel="stylesheet" href="vendor/quill/quill.core.css">
   <link rel="stylesheet" href="ideas.css">
+  <link rel="stylesheet" href="ideas-editor.css">
   <link rel="stylesheet" href="finance-ui.css">
+  <link rel="stylesheet" href="social.css">
   <script src="history.js" defer></script>
   <script src="record-editor.js" defer></script>
   <script src="finance-categories.js" defer></script>
@@ -19,11 +22,15 @@
   <script src="finance-meta.js" defer></script>
   <script src="finance-views.js" defer></script>
   <script src="finance-ledger.js" defer></script>
+  <script src="vendor/quill/quill.js" defer></script>
+  <script src="ideas-rich.js" defer></script>
+  <script src="ideas-editor.js" defer></script>
   <script src="ideas-ui.js" defer></script>
   <script src="schedule.js" defer></script>
   <script src="schedule-ui.js" defer></script>
   <script src="learning.js" defer></script>
   <script src="learning-ui.js" defer></script>
+  <script src="social-ui.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -37,7 +44,7 @@
         <a class="nav-link active" href="#overview"><span class="nav-icon" aria-hidden="true"><span data-icon="home"></span></span>首页</a>
         <a class="nav-link" href="#records"><span class="nav-icon" aria-hidden="true"><span data-icon="record"></span></span>记录</a>
         <a class="nav-link" href="#finance"><span class="nav-icon" aria-hidden="true"><span data-icon="finance"></span></span>收支</a>
-        <a class="nav-link" href="#monthly"><span class="nav-icon" aria-hidden="true"><span data-icon="stats"></span></span>统计</a>
+        <a class="nav-link" href="#social"><span class="nav-icon" aria-hidden="true"><span data-icon="social"></span></span>社交</a>
         <a class="nav-link" href="#personal"><span class="nav-icon" aria-hidden="true"><span data-icon="profile"></span></span>我的</a>
       </nav>
       <div class="sidebar-note"><span class="note-dot"></span><span>你的记录保存在这台设备的浏览器中。</span></div>
@@ -48,7 +55,7 @@
       <a class="mobile-bottom-link nav-link active" href="#overview"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="home"></span></span><span>首页</span></a>
       <a class="mobile-bottom-link nav-link" href="#records"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="record"></span></span><span>记录</span></a>
       <a class="mobile-bottom-link nav-link" href="#finance"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="finance"></span></span><span>收支</span></a>
-      <a class="mobile-bottom-link nav-link" href="#monthly"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="stats"></span></span><span>统计</span></a>
+      <a class="mobile-bottom-link nav-link" href="#social"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="social"></span></span><span>社交</span></a>
       <a class="mobile-bottom-link nav-link" href="#personal"><span class="mobile-nav-icon" aria-hidden="true"><span data-icon="profile"></span></span><span>我的</span></a>
     </nav>
 
@@ -143,7 +150,7 @@
       <section class="page-section" id="personal">
         <div class="section-heading personal-heading"><div><h2 class="sr-only">我的</h2></div></div>
         <div class="personal-data-status" id="personal-data-status" role="status" aria-live="polite"></div>
-        <nav class="personal-shortcuts ui-group-card" aria-label="设置与数据管理"><a class="settings-row ui-group-row" href="#settings" data-open-page><span class="ui-row-icon" data-icon="profile"></span><span class="ui-row-copy"><strong>个人资料与偏好</strong><small>资料、固定规则与本地说明</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#backup" data-open-page><span class="ui-row-icon" data-icon="export"></span><span class="ui-row-copy"><strong>数据备份</strong><small>完整 JSON v8 · 手动导出与恢复</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a></nav>
+        <nav class="personal-shortcuts ui-group-card" aria-label="设置与数据管理"><a class="settings-row ui-group-row" id="personal-statistics-entry" href="#monthly" data-open-page><span class="ui-row-icon" data-icon="stats"></span><span class="ui-row-copy"><strong>统计</strong><small>周、月、年趋势与分类排行</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#settings" data-open-page><span class="ui-row-icon" data-icon="profile"></span><span class="ui-row-copy"><strong>个人资料与偏好</strong><small>资料、固定规则与本地说明</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a><a class="settings-row ui-group-row" href="#backup" data-open-page><span class="ui-row-icon" data-icon="export"></span><span class="ui-row-copy"><strong>数据备份</strong><small>完整 JSON v9 · 手动导出与恢复</small></span><span class="ui-row-chevron" data-icon="chevronRight"></span></a></nav>
 
         <dialog class="panel personal-settings" id="personal-settings" aria-labelledby="personal-settings-title">
           <div class="panel-heading"><div><h3 id="personal-settings-title">个人资料</h3><p>更新个人资料和财富目标</p></div></div>
@@ -231,7 +238,7 @@
           <button class="text-button" id="finance-month-open" type="button" aria-haspopup="dialog"><span id="finance-month-label"></span><span data-icon="chevronDown"></span></button>
           <div class="period-summary"><a href="#finance/income" data-finance-view="income" data-open-page><span>收入 · USD</span><strong id="finance-income">—</strong></a><a href="#finance/expense" data-finance-view="expense" data-open-page><span>支出 · USD</span><strong id="finance-expense">—</strong></a></div>
         </section>
-        <nav class="finance-tools" aria-label="财务管理"><a href="#finance/bills" data-finance-view="bills" data-open-page><span data-icon="record"></span><span>账单</span></a><a href="#finance/budget" data-finance-view="budget" data-open-page><span data-icon="wallet"></span><span>预算</span></a><a href="#finance/assets" data-finance-view="assets" data-open-page><span data-icon="savings"></span><span>资产管家</span></a><span class="finance-unavailable" aria-label="购物返现：当前未提供"><span data-icon="shopping"></span><span>购物返现</span><small>未提供</small></span><button type="button" id="finance-more-open" aria-haspopup="dialog"><span data-icon="more"></span><span>更多</span></button></nav>
+        <nav class="finance-tools" aria-label="财务管理"><a href="#finance/bills" data-finance-view="bills" data-open-page><span data-icon="record"></span><span>账单</span></a><a href="#finance/budget" data-finance-view="budget" data-open-page><span data-icon="wallet"></span><span>预算</span></a><a href="#finance/assets" data-finance-view="assets" data-open-page><span data-icon="savings"></span><span>资产管家</span></a><button type="button" id="finance-category-open" aria-haspopup="dialog"><span data-icon="tag"></span><span>分类概览</span></button><button type="button" id="finance-more-open" aria-haspopup="dialog"><span data-icon="more"></span><span>更多</span></button></nav>
         <dialog class="editor-dialog ui-sheet" id="finance-more-dialog" aria-labelledby="finance-more-title"><div class="ui-sheet-header"><h2 id="finance-more-title">更多收支工具</h2><button class="ui-icon-button" type="button" id="finance-more-close" aria-label="关闭更多收支工具"><span data-icon="close"></span></button></div><div id="finance-search-slot"></div><div class="finance-more-balance"><span>所选月结余</span><strong id="finance-balance">—</strong><p id="finance-period-caption" class="subtle-copy"></p></div><div class="settings-list"><button class="settings-row" id="finance-filters-open" type="button" aria-haspopup="dialog"><span>筛选账单日期与范围</span><span data-icon="calendar"></span></button><a class="settings-row" href="#categories" data-open-page><span>分类管理</span><span data-icon="chevronRight"></span></a></div></dialog>
         <a class="finance-entry-fab" href="#bill/new" data-open-page aria-label="新增一笔收支"><span data-icon="add"></span></a>
         <section class="category-overview"><div class="panel-heading"><h3>分类概览</h3><label class="sr-only" for="finance-category-type">分类方向</label><select id="finance-category-type"><option value="expense">支出</option><option value="income">收入</option></select></div><div id="finance-category-list" class="rank-list"></div></section>
@@ -246,7 +253,7 @@
               <p class="record-form-status" id="finance-form-status" role="status" aria-live="polite"></p>
             </form>
           </article>
-          <article class="panel table-panel"><div class="panel-heading"><div><h3>账单列表</h3><p>按日期和关键词查找，每页 10 条</p></div><span class="soft-badge" id="finance-count">0 条记录</span></div>
+          <article class="panel table-panel"><div class="panel-heading"><div><h3>账单列表</h3><p>按日期连续查看全部匹配账单</p></div><span class="soft-badge" id="finance-count">0 条记录</span></div>
             <div class="history-controls" role="group" aria-label="收支历史筛选">
               <div class="history-filter-row">
                 <label>日期范围<select id="finance-history-range"><option value="selected">所选日</option><option value="week">截至所选日的近 7 天</option><option value="month">所选月</option><option value="all">全部日期</option><option value="custom">自定义日期</option></select></label>
@@ -257,7 +264,6 @@
             </div>
             <p class="history-summary" id="finance-history-summary" role="status" aria-live="polite"></p>
             <div class="table-wrap"><table><thead><tr><th>日期与备注</th><th>收入</th><th>支出</th><th>操作</th></tr></thead><tbody id="finance-table"></tbody></table><div class="empty-state" id="finance-empty"><span data-icon="empty"></span><strong>没有符合条件的收支记录</strong><p>可以调整日期范围、清空关键词，或添加一条新记录。</p></div></div>
-            <nav class="history-pagination" aria-label="收支历史分页"><button class="secondary-button" id="finance-history-prev" type="button">上一页</button><span id="finance-history-page">暂无记录</span><button class="secondary-button" id="finance-history-next" type="button">下一页</button></nav>
           </article>
         </div>
       </section>
@@ -298,6 +304,8 @@
         </div>
       </section>
 
+      <section class="page-section route-hidden" id="social-section" aria-label="社交演示"></section>
+
       <section class="page-section" id="monthly">
         <div class="section-heading monthly-heading"><div><p class="eyebrow">回顾与总结</p><h2>月度统计</h2><p class="page-description">按记录日期汇总学习、收支和工作任务。</p></div>
           <div class="month-controls"><label>年份<select id="month-year" aria-label="选择统计年份"></select></label><label>月份<select id="month-month" aria-label="选择统计月份">
@@ -322,9 +330,9 @@
         <div class="section-heading"><div><p class="eyebrow">让生活系统贴合自己</p><h2>数据备份</h2><p class="page-description">管理个人资料，并导出或安全合并你的学习、收支和工作记录。</p></div></div>
         <div class="backup-grid">
           <article class="panel backup-panel">
-            <div class="backup-icon" data-icon="export"></div><div class="panel-heading"><div><h3>导出备份</h3><p>保留旧版格式，或选择包含全部扩展的 v8</p></div></div>
+            <div class="backup-icon" data-icon="export"></div><div class="panel-heading"><div><h3>导出备份</h3><p>保留旧版格式，或选择包含妙想图片与全部扩展的 v9</p></div></div>
             <p class="subtle-copy">文件下载由浏览器完成；本站不会自动备份或上传你的数据。</p><ul class="backup-includes"><li>全部学习记录</li><li>全部收入与支出记录</li><li>全部工作任务及完成状态</li><li>每日记录和个人空间</li><li>查看日期和统计筛选设置</li></ul>
-            <button class="primary-button" id="backup-export-learning" type="button">导出完整 JSON v8</button><button class="secondary-button" id="backup-export" type="button">导出兼容 JSON v5</button><button class="secondary-button" id="backup-export-full" type="button">导出财务 JSON v6</button><button class="secondary-button" id="backup-export-schedule" type="button">导出日程 JSON v7</button><p class="subtle-copy" id="backup-extension-note">v8 包含学习、收支、日程、个人空间和全部扩展。v5/v6/v7 保留兼容用途，不含学习扩展；运行计时仅在导出副本中暂停，恢复后手动继续。</p>
+            <button class="primary-button" id="backup-export-ideas" type="button">导出完整 JSON v9</button><button class="secondary-button" id="backup-export-learning" type="button">导出兼容 JSON v8</button><button class="secondary-button" id="backup-export" type="button">导出兼容 JSON v5</button><button class="secondary-button" id="backup-export-full" type="button">导出财务 JSON v6</button><button class="secondary-button" id="backup-export-schedule" type="button">导出日程 JSON v7</button><p class="subtle-copy" id="backup-extension-note">v9 包含妙想格式、图片、持久草稿及原全部数据（最多40MB）。v5–v8 保留原格式，不含妙想扩展（最多10MB）。运行计时只在导出副本暂停；图片不会上传服务器。</p>
           </article>
           <article class="panel backup-panel">
             <div class="backup-icon restore-icon" data-icon="restore"></div><div class="panel-heading"><div><h3>导入并恢复</h3><p>选择之前导出的 JSON 文件，检查摘要后确认合并</p></div></div>
@@ -348,7 +356,7 @@
             <div><span>账单分类关联</span><strong id="backup-assignment-count">0</strong></div>
             <div><span>相同记录（将跳过）</span><strong id="backup-duplicate-count">0</strong></div>
           </div>
-          <div class="backup-safety-action"><button class="secondary-button" id="backup-before-restore" type="button">先导出当前完整数据</button><span class="subtle-copy">建议确认下载保存后，再合并恢复。</span></div><p id="backup-learning-summary" class="subtle-copy"></p><p id="backup-schedule-summary" class="subtle-copy"></p><p id="backup-meta-summary" class="subtle-copy"></p>
+          <div class="backup-safety-action"><button class="secondary-button" id="backup-before-restore" type="button">先导出当前完整数据</button><span class="subtle-copy">建议确认下载保存后，再合并恢复。</span></div><p id="backup-ideas-summary" class="subtle-copy"></p><p id="backup-learning-summary" class="subtle-copy"></p><p id="backup-schedule-summary" class="subtle-copy"></p><p id="backup-meta-summary" class="subtle-copy"></p>
           <p class="backup-import-plan" id="backup-import-plan"></p>
           <p class="backup-exported-at" id="backup-exported-at"></p>
           <p class="backup-conflict hidden" id="backup-conflict"></p>
@@ -388,8 +396,8 @@
         <div class="section-heading"><h2>设置</h2></div>
         <section class="settings-group"><h3>个人</h3><div class="settings-list"><button class="settings-row" type="button" data-open-profile><span>个人资料与财富目标</span><span>编辑 <span data-icon="chevronRight"></span></span></button></div></section>
         <section class="settings-group"><h3>当前规则</h3><dl class="personal-settings-facts"><div><dt>货币</dt><dd>USD · 固定美元</dd></div><div><dt>外观</dt><dd>浅色 · 黑白灰</dd></div><div><dt>周起始日</dt><dd>周一</dd></div><div><dt>提醒</dt><dd>尚未提供通知机制</dd></div></dl><p class="subtle-copy">当前规则不是可切换偏好。货币符号不会被替换为人民币，也不会重解释历史金额。</p><div class="settings-list"><a class="settings-row" href="#categories" data-open-page><span>收支分类</span><span>管理 <span data-icon="chevronRight"></span></span></a></div></section>
-        <section class="settings-group"><h3>数据</h3><div class="settings-list"><a class="settings-row" href="#backup" data-open-page><span>导出与备份恢复</span><span>完整 JSON v8 <span data-icon="chevronRight"></span></span></a></div></section>
-        <section class="settings-group"><h3>关于 Life OS</h3><dl class="personal-settings-facts"><div><dt>应用版本</dt><dd>本地网页 · 未设独立版本号</dd></div><div><dt>数据格式</dt><dd>完整 v8 · 可恢复 v1–v8</dd></div><div><dt>运行方式</dt><dd>浏览器网页 · 暂无 PWA 安装</dd></div></dl><p class="personal-local-note">数据保存在当前浏览器来源中，没有云端账户同步。更换地址、端口、浏览器或设备前，请先导出完整 JSON。这里的导出是手动文件下载，不是自动备份。</p></section>
+        <section class="settings-group"><h3>数据</h3><div class="settings-list"><a class="settings-row" href="#backup" data-open-page><span>导出与备份恢复</span><span>完整 JSON v9 <span data-icon="chevronRight"></span></span></a></div></section>
+        <section class="settings-group"><h3>关于 Life OS</h3><dl class="personal-settings-facts"><div><dt>应用版本</dt><dd>本地网页 · 未设独立版本号</dd></div><div><dt>数据格式</dt><dd>完整 v9 · 可恢复 v1–v9</dd></div><div><dt>运行方式</dt><dd>浏览器网页 · 暂无 PWA 安装</dd></div></dl><p class="personal-local-note">数据保存在当前浏览器来源中，没有云端账户同步。更换地址、端口、浏览器或设备前，请先导出完整 JSON。这里的导出是手动文件下载，不是自动备份。</p></section>
       </section>
       <section class="page-section" id="habit-detail-section"><article id="habit-detail" class="habit-detail"></article></section>
       <section class="page-section" id="search-section">

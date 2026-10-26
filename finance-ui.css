@@ -38,8 +38,8 @@
   #finance-table .ledger-day-row { display:block; width:100%; border:0; }
   #finance-table .ledger-day-row>td { display:block; width:100%; padding:8px 0 4px; background:transparent; }
   #finance-table .ledger-day-heading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; }
-  #finance-table .ledger-day-heading time { display:block; color:var(--text-tertiary); font-size:12px; font-weight:400; }
-  #finance-table .ledger-day-heading time>small { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+  #finance-table .ledger-day-heading time { position:relative; display:block; color:var(--text-tertiary); font-size:12px; font-weight:400; }
+  #finance-table .ledger-day-heading time>small { position:absolute; top:0; left:0; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
   #finance-table .ledger-day-totals { font-size:12px; gap:4px 10px; margin-left:auto; }
   #finance-table .ledger-day-totals strong { font-weight:400; color:var(--text-secondary); }
   #finance-table .ledger-day-scope { margin-top:4px; }
@@ -61,6 +61,16 @@
   #finance .bill-row-more>summary { color:var(--text-tertiary); }
   #finance .bill-row-more .ui-icon { width:18px; height:18px; }
   #finance .table-wrap { scroll-padding-block:8px; }
+  /* One continuous ledger scroll area; no finance pagination or lower disclosure. */
+  #finance .table-wrap { max-height:none; min-height:120px; overflow-y:auto; padding-bottom:64px; }
+  #finance-category-dialog .rank-list { max-height:55dvh; }
+  #finance-category-dialog .panel-heading { margin:0 0 var(--space-3); }
+  #finance-category-dialog #finance-category-type { min-height:44px; }
+  @media(max-width:760px) {
+    #finance { height:calc(100dvh - var(--nav-clearance) - var(--finance-fab-band) - var(--safe-top) - 20px); min-height:0; }
+    #finance .content-grid,#finance .table-panel { min-height:0; flex:1 1 auto; }
+    #finance .table-wrap { flex:1 1 auto; height:auto; min-height:64px; }
+  }
 
   #insights-main .statistics-header { position:relative; display:flex; align-items:center; justify-content:center; min-height:52px; }
   .statistics-type { display:inline-flex; align-items:center; position:relative; margin:0; }

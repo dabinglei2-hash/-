@@ -1,0 +1,104 @@
+[
+  {
+    "path": "vendor/quill/LICENSE",
+    "bytes": 1561,
+    "sha256": "395c12b616d6f58238b4be39284d4d9221b58dd6e1f1e34d9ab537e34abbb022",
+    "source": "https://registry.npmjs.org/quill/-/quill-2.0.3.tgz"
+  },
+  {
+    "path": "vendor/quill/package.json",
+    "bytes": 2946,
+    "sha256": "9586857338fdcc6d2c083db2dd0475423de530feba2c040972b12d699846209d",
+    "source": "https://registry.npmjs.org/quill/-/quill-2.0.3.tgz"
+  },
+  {
+    "path": "vendor/quill/quill.core.css",
+    "bytes": 10229,
+    "sha256": "1ad491e90881eaae64cdbbc87e82613c98350907e89c00e77faa4316d92098e5",
+    "source": "https://registry.npmjs.org/quill/-/quill-2.0.3.tgz"
+  },
+  {
+    "path": "vendor/quill/quill.js",
+    "bytes": 209274,
+    "sha256": "f6157c72ac9b3f51cdead426335688a027b12405d9d6a4daadd38a676b2d7ff2",
+    "source": "https://registry.npmjs.org/quill/-/quill-2.0.3.tgz"
+  },
+  {
+    "path": "vendor/quill/quill.js.LICENSE.txt",
+    "bytes": 159,
+    "sha256": "7b1938804d68d96764233d0a148a7501f39e547e6ae2dead4b16836e9b8d123c",
+    "source": "https://registry.npmjs.org/quill/-/quill-2.0.3.tgz"
+  },
+  {
+    "path": "vendor/tesseract/core7/LICENSE",
+    "bytes": 11358,
+    "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+    "source": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/core7/package.json",
+    "bytes": 1784,
+    "sha256": "554b867684677c81aa3ffab61f31e83618445fa09adee99e8fff3515cee6ca54",
+    "source": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/core7/tesseract-core-lstm.wasm.mjs",
+    "bytes": 3896484,
+    "sha256": "eef5f8b2f8e20e150680b20adaec4a60babafee3adbe8a94583c81fee46e8680",
+    "source": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/lang/chi_sim.traineddata",
+    "bytes": 2469156,
+    "sha256": "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730",
+    "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/chi_sim.traineddata"
+  },
+  {
+    "path": "vendor/tesseract/lang/LICENSE",
+    "bytes": 11358,
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "source": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/4.1.0/LICENSE"
+  },
+  {
+    "path": "vendor/tesseract/LICENSE.md",
+    "bytes": 11357,
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/package.json",
+    "bytes": 2914,
+    "sha256": "fa342f37afd665595eca66ee867197c47c9ac35a7967123d1132c39a40b3dfbd",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/tesseract.min.js",
+    "bytes": 62961,
+    "sha256": "000c27d9cd0def655f77b36c72a389c0ab13793aa31cb4d7aab56d09c0afbc7e",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/tesseract.min.js.LICENSE.txt",
+    "bytes": 149,
+    "sha256": "cdf963ced7d25a0f98901a547647b4d6e2dbe0197fd78c87a059a87b0e542fe2",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/worker.min.js",
+    "bytes": 111307,
+    "sha256": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/worker.min.js.LICENSE.txt",
+    "bytes": 466,
+    "sha256": "45f54171aeaa1d10c0c1a66f374b7bba1f02472b1487fbe892eec04f840002ac",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  },
+  {
+    "path": "vendor/tesseract/worker.min.mjs",
+    "bytes": 111307,
+    "sha256": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
+    "source": "https://registry.npmjs.org/tesseract.js/-/tesseract.js-7.0.0.tgz"
+  }
+]

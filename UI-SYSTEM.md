@@ -57,7 +57,7 @@ CSS 层顺序为 `reset → layout → components → motion`。组件层优先�
 
 ## 导航和返回
 
-一级入口保持：首页 `#overview`、记录 `#records`、收支 `#finance`、统计 `#monthly`、我的 `#personal`。
+2026-10-25按用户明确要求调整一级入口：首页 `#overview`、记录 `#records`、收支 `#finance`、社交 `#social`、我的 `#personal`。统计保留`#monthly`，迁到“我的”，复用统一返回栏；统计及其分类详情选中“我的”。社交详情`#social/post/<id>`复用原History来源与位置快照，选中“社交”。
 
 二级页面统一使用应用返回栏。返回优先使用现有 `history.state.lifeReturn`；任务详情继续使用原 `taskNavigation`，今日回顾继续调用原返回函数。原关键词、日期、分页、滚动快照和任务序列继续保留。直接打开二级链接时使用对应模块作为安全后备，不统一跳首页。
 

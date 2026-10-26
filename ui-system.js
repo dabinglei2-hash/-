@@ -97,7 +97,7 @@
   }
   function syncRoute(route, section) {
     if (route === '#bill/new' && previousRoute !== route) dismissToast();
-    const primary=['#overview','#records','#finance','#monthly','#personal'].includes(route);
+    const primary=['#overview','#records','#finance','#social','#personal'].includes(route);
     const depth=Number(history.state?.uiDepth)||0;
     const direction=depth<previousDepth?'back':'forward';
     if(section){

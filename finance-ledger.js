@@ -1,4 +1,4 @@
-/* Read-only ledger presentation. Pagination and totals come from LifeHistory. */
+/* Read-only ledger presentation. Filtering, ordering and totals come from LifeHistory. */
 (function (root) {
   'use strict';
   const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

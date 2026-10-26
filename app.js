@@ -152,11 +152,6 @@
     filter.className = 'list-toolbar';
     filter.innerHTML = '<label>历史笔记 <select id="diary-filter"><option value="all">全部日期</option><option value="date">所选日期</option></select></label><input id="diary-filter-date" class="hidden" type="date" aria-label="筛选笔记日期">';
     $('#diary-list').before(filter);
-    const pager = document.createElement('nav');
-    pager.className = 'history-pagination';
-    pager.setAttribute('aria-label', '妙想分页');
-    pager.innerHTML = '<button class="secondary-button" type="button" id="diary-prev">上一页</button><span id="diary-page">暂无笔记</span><button class="secondary-button" type="button" id="diary-next">下一页</button>';
-    $('#diary-list').after(pager);
     $('.diary-panel h3').textContent = '历史妙想';
     $('.diary-panel .panel-heading p:not(.eyebrow)').textContent = '点击标题查看完整内容。';
     wrapForm('#habit-form', 'habit-compose', '添加习惯');
@@ -206,9 +201,13 @@
     $('#finance-filters-open').addEventListener('click',()=>window.LifeUI.closeSheet(more,()=>filters.showModal()));
     const filterClose=document.createElement('button');filterClose.id='finance-filter-close';filterClose.type='button';filterClose.className='primary-button';filterClose.textContent='查看账单';
     filters.append(filterClose);filterClose.addEventListener('click',()=>window.LifeUI.closeSheet(filters));
-    const breakdown=document.createElement('details');breakdown.className='finance-breakdown compose-details';breakdown.innerHTML='<summary>分类概览</summary>';
-    const categoryOverview=$('#finance .category-overview');categoryOverview.before(breakdown);breakdown.append(categoryOverview);
-    $('#finance .content-grid').after(breakdown);
+    const breakdown=document.createElement('dialog');breakdown.id='finance-category-dialog';breakdown.className='editor-dialog ui-sheet';breakdown.setAttribute('aria-labelledby','finance-category-title');
+    breakdown.innerHTML='<header class="ui-sheet-header"><h2 id="finance-category-title">分类概览</h2><button class="ui-icon-button" id="finance-category-close" type="button" aria-label="关闭分类概览"><span data-icon="close"></span></button></header>';
+    const categoryOverview=$('#finance .category-overview');breakdown.append(categoryOverview);document.body.append(breakdown);
+    categoryOverview.querySelector('h3').classList.add('sr-only');
+    $('#finance-category-open').addEventListener('click',()=>breakdown.showModal());
+    $('#finance-category-close').addEventListener('click',()=>window.LifeUI.closeSheet(breakdown));
+    breakdown.addEventListener('click',event=>{if(event.target.closest('a[data-open-page]'))window.LifeUI.closeSheet(breakdown);});
     const anchor = document.createElement('label');
     anchor.className = 'compact-field';
     anchor.innerHTML = '参考日期<input id="finance-history-anchor" type="date">';
@@ -741,18 +740,14 @@
     if (tag && !options.includes(tag)) $('#idea-tag-filter').add(new Option('#' + tag, tag));
     $('#idea-tag-filter').value = tag;
     const entries = window.LifeIdeasUI.entries(window.LifeContent.filterNotes(personalData.diary, noteTags, { date, tag, query: $('#idea-query').value }));
-    const pages = Math.max(1, Math.ceil(entries.length / 10));
-    diaryPage = Math.min(pages, Math.max(1, diaryPage));
+    diaryPage = 1;
     $('#diary-count').textContent = entries.length + ' 条';
-    $('#diary-list').innerHTML = window.LifeIdeasUI.markup(entries.slice((diaryPage - 1) * 10, diaryPage * 10),id=>window.LifeContent.tagsFor(noteTags,id));
+    $('#diary-list').innerHTML = window.LifeIdeasUI.markup(entries,id=>window.LifeContent.tagsFor(noteTags,id));
     const filtered = Boolean(date || tag || $('#idea-query').value.trim());
     $('#idea-filter-summary').textContent = [$('#idea-query').value.trim() ? '关键词：' + $('#idea-query').value.trim() : '', tag ? '#' + tag : '', date].filter(Boolean).join(' · ') || '全部日期 · 全部妙想';
     $('#diary-empty').classList.toggle('hidden', entries.length > 0);
-    $('#diary-empty strong').textContent = filtered ? '当前条件下没有妙想' : '还没有妙想';
-    $('#diary-empty p').textContent = filtered ? '可清除上方条件，查看全部妙想。' : '点击“新建妙想”记录一个想法。';
-    $('#diary-page').textContent = entries.length ? diaryPage + ' / ' + pages + ' 页' : '暂无妙想';
-    $('#diary-prev').disabled = diaryPage <= 1;
-    $('#diary-next').disabled = diaryPage >= pages;
+    $('#diary-empty').classList.add('idea-inline-empty');
+    $('#diary-empty').textContent = filtered ? '没有匹配的妙想 · 可在搜索中清除筛选' : '还没有妙想，记录此刻的想法。';
     renderWorkspaceHome();
     renderGlobalSearch();
     window.LifeIdeasUI.refresh();
@@ -782,6 +777,7 @@
     const entry = personalData.diary.find((item) => item.id === id);
     if (!entry) return false;
     $('#note-detail').innerHTML = window.LifeIdeasUI.detail(entry,window.LifeContent.tagsFor(noteTags,id));
+    window.LifeIdeasRich.hydrate($('#note-detail'),personalData.diary);
     return true;
   }
 
@@ -1305,14 +1301,15 @@
   }
 
   function validateBackup(backup) {
-    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6, 7, 8].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
+    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6, 7, 8, 9].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
     const backupKeys = backup.schemaVersion === 1
       ? ['format', 'schemaVersion', 'exportedAt', 'data', 'settings']
       : backup.schemaVersion >= 4 ? ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'financeCategories', 'settings'] : ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'settings'];
     if (backup.schemaVersion >= 5) backupKeys.push('noteTags');
     if (backup.schemaVersion >= 6) backupKeys.push('financeMeta');
     if (backup.schemaVersion >= 7) backupKeys.push('scheduleMeta');
-    if (backup.schemaVersion === 8) backupKeys.push('learningMeta');
+    if (backup.schemaVersion >= 8) backupKeys.push('learningMeta');
+    if (backup.schemaVersion === 9) backupKeys.push('ideasMeta','ideasAttachments','ideasDraft');
     if (!hasExactKeys(backup, backupKeys)) return '文件不是有效的生活管理台备份。';
     if (typeof backup.exportedAt !== 'string' || !Number.isFinite(Date.parse(backup.exportedAt))) return '备份时间字段无效。';
     const dataError = validateData(backup.data);
@@ -1329,7 +1326,8 @@
     if (backup.schemaVersion >= 5) { const error = window.LifeContent.validate(backup.noteTags, backup.personal.diary); if (error) return error; }
     if (backup.schemaVersion >= 6) { const error = window.LifeFinanceMeta.validate(backup.financeMeta, backup.financeCategories, window.LifeIcons.names); if (error) return error; }
     if (backup.schemaVersion >= 7) { const error = window.LifeSchedule.validate(backup.scheduleMeta, backup.data.tasks); if (error) return error; }
-    if (backup.schemaVersion === 8) { const error = window.LifeLearning.validate(backup.learningMeta, backup.data, true); if (error) return error; }
+    if (backup.schemaVersion >= 8) { const error = window.LifeLearning.validate(backup.learningMeta, backup.data, true); if (error) return error; }
+    if(backup.schemaVersion===9){const error=window.LifeIdeasRich.validate(backup.ideasMeta,backup.personal.diary);if(error)return error;if(!Array.isArray(backup.ideasAttachments))return '图片备份缺失。';}
     const settingsKeys = backup.schemaVersion === 1
       ? ['selectedDate', 'monthYear', 'monthMonth']
       : backup.schemaVersion >= 4 ? ['selectedDate', 'monthYear', 'monthMonth', 'personalDate', 'financePeriod', 'insightsPeriod', 'insightsAnchor'] : ['selectedDate', 'monthYear', 'monthMonth', 'personalDate'];
@@ -1481,10 +1479,12 @@
     const mergedCore = Object.fromEntries(['studies','finances','tasks'].map(name => [name, currentData[name].concat(dataMerge.additions[name])]));
     const storedLearning = window.LifeLearning.read(localStorage, currentData);
     const learningMerge = storedLearning.error ? { error:storedLearning.error } : window.LifeLearning.merge(storedLearning.data, backup.learningMeta || window.LifeLearning.blank(), mergedCore);
+    const storedIdeas=window.LifeIdeasRich.read(currentPersonal.diary);
+    const ideasMerge=storedIdeas.error?{error:storedIdeas.error}:window.LifeIdeasRich.merge(storedIdeas.data,backup.ideasMeta||window.LifeIdeasRich.blank(),personalMerge.merged?.diary||currentPersonal.diary);
     return {
-      error: storedLearning.error || learningMerge.conflicts?.join('；') || dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error || scheduleMerge.error,
+      error: storedIdeas.error || ideasMerge.error || storedLearning.error || learningMerge.conflicts?.join('；') || dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error || scheduleMerge.error,
       duplicates: dataMerge.duplicates + personalMerge.duplicates + categoryMerge.duplicates,
-      additions: dataMerge.additions, personal: personalMerge, categories: categoryMerge, noteTags: tagMerge, financeMeta: metaMerge, scheduleMeta: scheduleMerge, learningMeta:learningMerge,
+      additions: dataMerge.additions, personal: personalMerge, categories: categoryMerge, noteTags: tagMerge, financeMeta: metaMerge, scheduleMeta: scheduleMerge, learningMeta:learningMerge,ideasMeta:ideasMerge,
     };
   }
 
@@ -1501,8 +1501,9 @@
     $('#backup-file-name').textContent = fileName;
     const meta = backup.financeMeta;
     $('#backup-meta-summary').textContent = meta ? '财务扩展：分类图标 ' + meta.categoryIcons.length + ' 项 · 预算 ' + meta.budgets.length + ' 项 · 资产/负债账户 ' + meta.accounts.length + ' 项（含归档）。' : '旧版备份：现有分类图标、预算与账户会保留。';
-    $('#backup-learning-summary').textContent = backup.learningMeta ? '学习扩展：目标 ' + backup.learningMeta.dailyGoals.length + ' 项 · 计划关联 ' + backup.learningMeta.plans.length + ' 项 · 计时 ' + backup.learningMeta.focusSessions.length + ' 次。运行计时以暂停副本恢复，需手动继续；冲突停止。' : '此版本不含学习扩展；当前目标、计划与计时将保留。完整备份请选择 v8。';
+    $('#backup-learning-summary').textContent = backup.learningMeta ? '学习扩展：目标 ' + backup.learningMeta.dailyGoals.length + ' 项 · 计划关联 ' + backup.learningMeta.plans.length + ' 项 · 计时 ' + backup.learningMeta.focusSessions.length + ' 次。运行计时以暂停副本恢复，需手动继续；冲突停止。' : '此版本不含学习扩展；当前目标、计划与计时将保留。完整备份请选择 v9。';
     $('#backup-schedule-summary').textContent = backup.scheduleMeta ? '日程扩展：备注/优先级/截止日 ' + backup.scheduleMeta.taskDetails.length + ' 条 · 重复规则 ' + backup.scheduleMeta.series.length + ' 项 · 实例标记 ' + backup.scheduleMeta.occurrences.length + ' 条；冲突停止。' : '此备份不含日程扩展；现有规则、备注与实例标记会保留。';
+    $('#backup-ideas-summary').textContent=backup.schemaVersion===9?'妙想：格式副本 '+backup.ideasMeta.documents.length+' 条 · 图片 '+backup.ideasAttachments.length+' 张 · 未保存草稿 '+(backup.ideasDraft?'1 份':'0 份')+'。冲突停止，不覆盖。':'此版本不含妙想格式、图片与持久草稿；当前扩展会保留。完整备份请选择 v9。';
     $('#backup-study-count').textContent = backup.data.studies.length;
     $('#backup-finance-count').textContent = backup.data.finances.length;
     $('#backup-task-count').textContent = backup.data.tasks.length;
@@ -1550,8 +1551,11 @@
     $('#insights-anchor').value = settings.insightsAnchor || settings.selectedDate;
   }
 
-  function exportBackup(full = false) {
-    const version = full === 8 ? 8 : full === 7 ? 7 : full ? 6 : 5;
+  async function exportBackup(full = false) {
+    const button=full===9?$('#backup-export-ideas'):null;if(button?.disabled)return;if(button)button.disabled=true;
+    try {
+    const exportSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key].map(k=>[k,localStorage.getItem(k)]));
+    const version = full === 9 ? 9 : full === 8 ? 8 : full === 7 ? 7 : full ? 6 : 5;
     const stored = readStoredDataForBackup();
     if (stored.error) { setBackupStatus(stored.error, 'error'); return; }
     const storedPersonal = readStoredPersonalForBackup();
@@ -1591,16 +1595,23 @@
       if (storedSchedule.error) { setBackupStatus(storedSchedule.error, 'error'); return; }
       backup.schemaVersion = 7; backup.scheduleMeta = storedSchedule.data;
     }
-    if (version === 8) {
+    if (version >= 8) {
       const storedLearning = window.LifeLearning.read(localStorage, stored.data);
       if (storedLearning.error) { setBackupStatus(storedLearning.error,'error'); return; }
       const frozen = window.LifeLearning.freeze(storedLearning.data, Date.parse(backup.exportedAt));
       if (frozen.error) { setBackupStatus(frozen.error,'error'); return; }
       backup.schemaVersion = 8; backup.learningMeta = frozen.data;
     }
+    if(version===9){
+      const rich=window.LifeIdeasRich.read(backup.personal.diary);if(rich.error)throw new Error(rich.error);
+      backup.ideasMeta={version:1,documents:rich.data.documents.filter(d=>backup.personal.diary.some(n=>n.id===d.recordId))};
+      Object.assign(backup,await window.LifeIdeasRich.exportMedia(backup.ideasMeta));backup.schemaVersion=9;await window.LifeIdeasRich.decodeBackup(backup);
+      if(Object.entries(exportSnapshot).some(([k,v])=>localStorage.getItem(k)!==v))throw new Error('导出期间数据发生变化，请重新导出以获得一致副本。');
+    }
     const validation = validateBackup(backup);
     if (validation) { setBackupStatus(validation,'error'); return; }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+    if(version===9&&blob.size>40*1024*1024)throw new Error('完整v9超过40MB，未生成截断备份。原数据保留。');
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -1610,8 +1621,9 @@
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setBackupStatus((version === 8 ? '完整 v8：包含学习、财务、日程扩展；运行计时的副本已暂停。' : version === 7 ? '日程 v7：不含学习扩展，完整备份请选择 v8。' : version === 6 ? '财务 v6：不含日程和学习扩展；完整备份请选择 v8。' : '兼容 v5：不含财务、日程和学习扩展；完整备份请选择 v8。') + `已发起 JSON 下载：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请在浏览器下载列表确认文件保存完成。`, 'success');
+    setBackupStatus((version===9 ? '完整 v9：含妙想格式、图片与草稿，以及原全部数据；运行计时副本已暂停。' : version === 8 ? '兼容 v8（不含妙想格式、图片与持久草稿）：包含学习、财务、日程扩展；运行计时的副本已暂停。' : version === 7 ? '日程 v7：不含学习扩展，完整备份请选择 v9。' : version === 6 ? '财务 v6：不含日程和学习扩展；完整备份请选择 v9。' : '兼容 v5：不含财务、日程和学习扩展；完整备份请选择 v9。') + (version<9?'此兼容版本不含妙想富文本、图片和持久草稿。':'') + `已发起 JSON 下载：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请在浏览器下载列表确认文件保存完成。`, 'success');
     $('#backup-session-info').textContent = '本次会话最近发起导出：' + new Date(backup.exportedAt).toLocaleString('zh-CN') + ' · JSON v' + backup.schemaVersion + '。这不是已验证的最近备份时间；刷新后不保留此提示。';
+    } catch(error) { setBackupStatus('导出失败：'+error.message,'error'); } finally {if(button)button.disabled=false;}
   }
 
   async function inspectBackupFile(file) {
@@ -1619,10 +1631,11 @@
     $('#backup-preview').classList.add('hidden');
     setBackupStatus('');
     if (!file) return;
-    if (file.size > MAX_BACKUP_BYTES) { setBackupStatus('文件超过 10 MB，已拒绝读取。', 'error'); return; }
+    if (file.size > 40*1024*1024) { setBackupStatus('文件超过40MB，已拒绝读取。','error'); return; }
     window.LifeUI.setBusy($('#backup-choose'), true);
     try {
       const backup = JSON.parse(await file.text());
+      if(backup.schemaVersion!==9&&file.size>MAX_BACKUP_BYTES){setBackupStatus('旧版备份不能超过10MB。','error');return;}
       const error = validateBackup(backup);
       if (error) { setBackupStatus(`备份文件无效：${error}`, 'error'); return; }
       if (backup.schemaVersion === 1) {
@@ -1635,12 +1648,13 @@
       if (stored.error) { setBackupStatus(stored.error, 'error'); return; }
       const storedPersonal = readStoredPersonalForBackup();
       if (storedPersonal.error) { setBackupStatus(storedPersonal.error, 'error'); return; }
+      if(backup.schemaVersion===9){const decoded=await window.LifeIdeasRich.decodeBackup(backup);await window.LifeIdeasRich.mediaConflict(decoded);}
       const analysis = analyzeCompleteMerge(stored.data, storedPersonal.data, backup);
       showBackupPreview(file.name, backup, analysis);
       if (analysis.error) setBackupStatus(analysis.error, 'error');
       else setBackupStatus('文件格式和内容有效。请核对上方摘要，再决定是否合并导入。');
     } catch (error) {
-      setBackupStatus('无法读取文件。请确认它是有效的 JSON 备份文件。', 'error');
+      setBackupStatus('无法读取备份：'+error.message,'error');
     } finally {
       window.LifeUI.setBusy($('#backup-choose'), false);
     }
@@ -1648,11 +1662,13 @@
 
   async function confirmBackupImport() {
     if (!pendingBackup) return;
+    const importCandidate=pendingBackup;
     if (!await confirmAction('将按预览摘要安全合并备份；相同记录会跳过，冲突记录不会覆盖。', '确认恢复备份', '确认合并')) return;
-    if (!pendingBackup) return;
+    if (pendingBackup!==importCandidate) {setBackupStatus('预览文件已改变，请重新核对摘要后确认。','error');return;}
+    const importSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key].map(k=>[k,localStorage.getItem(k)]));
     const stored = readStoredDataForBackup(), storedPersonal = readStoredPersonalForBackup();
     if (stored.error || storedPersonal.error) { setBackupStatus(stored.error || storedPersonal.error, 'error'); return; }
-    const analysis = analyzeCompleteMerge(stored.data, storedPersonal.data, pendingBackup);
+    const analysis = analyzeCompleteMerge(stored.data, storedPersonal.data, importCandidate);
     if (analysis.error) {
       $('#backup-conflict').textContent = analysis.error;
       $('#backup-conflict').classList.remove('hidden');
@@ -1678,8 +1694,15 @@
     if (keepSchedule) entries.push([window.LifeSchedule.key, analysis.scheduleMeta.merged]);
     const keepLearning = window.LifeLearning.hasData(analysis.learningMeta.merged) || localStorage.getItem(window.LifeLearning.key) !== null;
     if (keepLearning) entries.push([window.LifeLearning.key,analysis.learningMeta.merged]);
-    const error = writeStoreTransaction(entries);
-    if (error) { setBackupStatus(error, 'error'); return; }
+    if(analysis.ideasMeta.merged.documents.length||localStorage.getItem(window.LifeIdeasRich.key)!==null)entries.push([window.LifeIdeasRich.key,analysis.ideasMeta.merged]);
+    $('#backup-import-confirm').disabled=true;
+    $('#backup-choose').disabled=true;$('#backup-file').disabled=true;
+    let importWarning='';
+    try{
+      if(importCandidate.schemaVersion===9){const decoded=await window.LifeIdeasRich.decodeBackup(importCandidate);await window.LifeIdeasRich.mediaConflict(decoded);const draftExpected=JSON.stringify(await window.LifeIdeasRich.get('drafts','current')||null);const result=await window.LifeIdeasRich.commit(entries,writeStoreTransaction,{expected:importSnapshot,assets:decoded.assets,draft:decoded.draft,draftExpected});importWarning=result.warning;}
+      else{const error=writeStoreTransaction(entries);if(error)throw new Error(error);}
+    }catch(error){setBackupStatus('恢复未完成：'+error.message,'error');$('#backup-import-confirm').disabled=false;return;}
+    finally{$('#backup-choose').disabled=false;$('#backup-file').disabled=false;}
     learningMeta = analysis.learningMeta.merged; learningMetaError = '';
     financeMeta = analysis.financeMeta.merged; financeMetaError = '';
     scheduleMeta = analysis.scheduleMeta.merged; scheduleMetaError = '';
@@ -1688,7 +1711,7 @@
     data = nextData; personalData = nextPersonal;
     categoryData = keepCategoryStore ? nextCategories : window.LifeCategories.blank();
     dataError = personalDataError = categoryError = '';
-    const imported = pendingBackup;
+    const imported = importCandidate;
     const added = Object.values(analysis.additions).reduce((sum, list) => sum + list.length, 0);
     const personalAdded = Object.values(analysis.personal.additions).reduce((sum, list) => sum + list.length, 0);
     const categoryAdded = analysis.categories.additions.categories.length;
@@ -1700,6 +1723,7 @@
     $('#backup-preview').classList.add('hidden');
     $('#backup-file').value = '';
     setBackupStatus('导入成功：新增 ' + (added + personalAdded) + ' 条记录、' + categoryAdded + ' 项分类，补充 ' + analysis.personal.newCheckins + ' 次打卡，跳过 ' + analysis.duplicates + ' 项相同数据。现有记录与历史分类均保留。', 'success');
+    if(importWarning)setBackupStatus('主要记录已合并，附加恢复尚未完成：'+importWarning,'error');
   }
 
   function renderStudies(items) {
@@ -1725,6 +1749,7 @@
     const result = window.LifeHistory.select(type === 'study' ? data.studies : data.finances, {
       type, anchor: type === 'finance' ? ($('#finance-history-anchor').value || today()) : selectedDate(), range, start: $(`${prefix}start`).value,
       end: $(`${prefix}end`).value, query: $(`${prefix}search`).value, page: historyPages[type],
+      paginate: type !== 'finance',
     });
     historyPages[type] = result.page;
     if (type === 'study') renderStudies(result.items);
@@ -1741,9 +1766,11 @@
       ? `学习合计 ${result.totals.minutes} 分钟`
       : `收入 ${money(result.totals.income / 100)} · 支出 ${money(result.totals.expense / 100)} · 差额 ${money((result.totals.income - result.totals.expense) / 100)}`;
     status.textContent = result.error || `${result.label}${searchLabel} · 共 ${result.count} 条 · ${summary}`;
-    $(`${prefix}page`).textContent = result.count ? `第 ${result.page} / ${result.pages} 页` : '暂无记录';
-    $(`${prefix}prev`).disabled = result.page <= 1 || Boolean(result.error);
-    $(`${prefix}next`).disabled = result.page >= result.pages || Boolean(result.error);
+    if (type === 'study') {
+      $(`${prefix}page`).textContent = result.count ? `第 ${result.page} / ${result.pages} 页` : '暂无记录';
+      $(`${prefix}prev`).disabled = result.page <= 1 || Boolean(result.error);
+      $(`${prefix}next`).disabled = result.page >= result.pages || Boolean(result.error);
+    }
   }
 
   function bindHistoryControls(type) {
@@ -1764,7 +1791,7 @@
       historyPages[type] = 1;
       renderHistory(type);
     });
-    for (const [action, offset] of [['prev', -1], ['next', 1]]) {
+    for (const [action, offset] of type === 'study' ? [['prev', -1], ['next', 1]] : []) {
       $(`${prefix}${action}`).addEventListener('click', () => {
         historyPages[type] += offset;
         renderHistory(type);
@@ -2063,7 +2090,7 @@
   bindHistoryControls('finance');
   $('#month-month').addEventListener('change', renderMonthly);
   $('#personal-date').addEventListener('change', (event) => {
-    $('#diary-date').value = event.target.value;
+    if (!noteEdit && !noteFormChanged) $('#diary-date').value = event.target.value;
     renderDiary();
     renderHabits();
   });
@@ -2221,7 +2248,8 @@
   $('#backup-export-full').addEventListener('click', () => exportBackup(true));
   $('#backup-export-schedule').addEventListener('click', () => exportBackup(7));
   $('#backup-export-learning').addEventListener('click', () => exportBackup(8));
-  $('#backup-before-restore').addEventListener('click', () => exportBackup(8));
+  $('#backup-before-restore').addEventListener('click', () => exportBackup(9));
+  $('#backup-export-ideas').addEventListener('click', () => exportBackup(9));
   $('#backup-choose').addEventListener('click', () => $('#backup-file').click());
   $('#backup-file').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
@@ -2469,6 +2497,7 @@
   });
 
   const routeSectionIds = { '#search': 'search-section', '#entry': 'entry-detail-section', '#overview': 'overview-section', '#records': 'records-section', '#today-record': 'today-record', '#daily-notes': 'daily-notes-section', '#habits': 'habits-section', '#learning': 'learning', '#tasks': 'work-plan-section', '#finance': 'finance', '#goals': 'goals-section', '#monthly': 'monthly', '#personal': 'personal', '#backup': 'backup', '#settings': 'settings-section', '#categories': 'categories-section', '#bill/new': 'bill-section', '#finance-detail': 'finance-detail-section' };
+  routeSectionIds['#social'] = 'social-section';
   ['#ideas/search','#ideas/menu','#ideas/select','#ideas/write'].forEach(route=>routeSectionIds[route]='daily-notes-section');
   const isNoteRoute = (target) => /^#note\//.test(target || '');
   const isGoalRoute = (target) => /^#goal\//.test(target || '');
@@ -2781,7 +2810,8 @@
     $('#idea-tag-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addDraftTag(event.target.value); } });
     $('#diary-form').addEventListener('input', () => { noteFormChanged = true; $('#idea-edit-cancel').classList.remove('hidden'); $('#idea-edit-cancel').textContent = noteEdit ? '取消编辑' : '清空草稿'; });
     $('#idea-edit-cancel').addEventListener('click', async () => {
-      if (noteFormChanged && !await confirmAction('放弃当前妙想的未保存修改？', '放弃修改', '放弃修改')) return;
+      if (!await confirmAction('放弃当前妙想的未保存草稿？已保存的记录不受影响。', '放弃草稿', '放弃草稿')) return;
+      try { await window.LifeIdeasEditor.discard(); } catch(error) { toast(error.message,true);return; }
       resetIdeaForm(); window.LifeIdeasUI.discarded();
     });
     ['#idea-query','#idea-tag-filter'].forEach((selector) => $(selector).addEventListener(selector === '#idea-query' ? 'input' : 'change', () => { diaryPage = 1; renderDiary(); rememberView(); }));
@@ -2862,12 +2892,16 @@
   function resetIdeaForm() {
     noteEdit = null; pendingNoteTags = []; noteFormChanged = false;
     $('#diary-form').reset(); $('#diary-date').value = today();
-    $('#idea-submit').textContent = '保存妙想'; $('#idea-edit-cancel').classList.add('hidden');
-    $('#idea-status').textContent = ''; renderTagDraft();
+    $('#idea-submit').innerHTML = window.LifeIcons.render('check'); $('#idea-edit-cancel').classList.add('hidden');
+    $('#idea-status').textContent = ''; renderTagDraft(); window.LifeIdeasEditor?.reset();
   }
 
   async function beginNoteEdit(id) {
     if (noteFormChanged && !await confirmAction('当前有未保存的妙想。放弃草稿并打开这条记录？', '切换编辑', '放弃并打开')) return;
+    try {
+      if(noteFormChanged)await window.LifeIdeasEditor.discard();
+      else if(await window.LifeIdeasRich.get('drafts','current')){toast('还有未保存草稿，请先通过新建入口恢复，或在妙想菜单中确认放弃。',true);return;}
+    }catch(error){toast(error.message,true);return;}
     const stored = readStoredPersonalForBackup(), storedTags = readNoteTags();
     if (stored.error || storedTags.error) { toast(stored.error || storedTags.error,true); return; }
     const note = stored.data.diary.find((row) => row.id === id);
@@ -2875,32 +2909,43 @@
     personalData = stored.data; noteTags = storedTags.data;
     noteEdit = { expected: JSON.stringify(note), id, tags: JSON.stringify(window.LifeContent.tagsFor(noteTags,id)) };
     pendingNoteTags = window.LifeContent.tagsFor(noteTags,id);
+    window.LifeIdeasEditor.reset();
     $('#idea-tag-input').value = ''; $('#idea-status').textContent = '';
     $('#diary-date').value = note.date; $('#diary-title-input').value = note.title; $('#diary-content-input').value = note.content;
-    noteFormChanged = false; renderTagDraft(); $('#idea-submit').textContent = '保存修改'; $('#idea-edit-cancel').textContent = '取消编辑'; $('#idea-edit-cancel').classList.remove('hidden');
+    noteFormChanged = false; renderTagDraft(); $('#idea-submit').innerHTML = window.LifeIcons.render('check'); $('#idea-edit-cancel').textContent = '取消编辑'; $('#idea-edit-cancel').classList.remove('hidden');
     window.LifeIdeasUI.openEditor();
   }
 
-  function saveIdea(event) {
+  async function saveIdea(event) {
     event.preventDefault();
     const button = $('#idea-submit'); if (button.disabled) return; button.disabled = true;
+    window.LifeIdeasEditor.setSaving(true);
     try {
       if ($('#idea-tag-input').value.trim()) { $('#idea-status').textContent = '请先添加输入中的标签，或清空标签输入。'; return; }
+      const prepared = await window.LifeIdeasEditor.prepare();
       const stored = readStoredPersonalForBackup(), storedTags = readNoteTags();
       if (stored.error || storedTags.error) { $('#idea-status').textContent = stored.error || storedTags.error; return; }
       const existing = noteEdit ? stored.data.diary.find((row) => row.id === noteEdit.id) : null;
       if (noteEdit && (!existing || JSON.stringify(existing) !== noteEdit.expected || JSON.stringify(window.LifeContent.tagsFor(storedTags.data,noteEdit.id)) !== noteEdit.tags)) { $('#idea-status').textContent = '这条妙想或标签已在其他页面改变。输入仍保留，请复制后重新打开最新记录。'; return; }
-      const note = { id: existing?.id || makeId(), date: $('#diary-date').value, title: $('#diary-title-input').value.trim(), content: $('#diary-content-input').value.trim(), createdAt: existing?.createdAt ?? Date.now() };
+      const note = { id: existing?.id || prepared.saveId, date: existing?.date || $('#diary-date').value, title: existing?.title ?? $('#diary-title-input').value, content: prepared.plain, createdAt: existing?.createdAt ?? Date.now() };
+      if (!existing && stored.data.diary.some(n=>n.id===note.id)) { $('#idea-status').textContent='这条草稿已保存，请重新打开原记录编辑；不会重复新增。'; return; }
       const next = JSON.parse(JSON.stringify(stored.data));
       next.diary = existing ? next.diary.map((row) => row.id === note.id ? note : row) : [...next.diary,note];
       const nextTags = window.LifeContent.assign(storedTags.data,note.id,pendingNoteTags);
       const error = !note.content ? '请填写妙想内容。' : validatePersonalData(next) || window.LifeContent.validate(nextTags,next.diary);
       if (error) { $('#idea-status').textContent = error; return; }
-      const saveError = writeStoreTransaction([[PERSONAL_STORAGE_KEY,next],[NOTE_TAGS_KEY,nextTags]]);
-      if (saveError) { $('#idea-status').textContent = saveError; return; }
+      const rich=window.LifeIdeasRich.read(stored.data.diary);
+      if(rich.error)throw new Error(rich.error);
+      if(rich.raw!==prepared.metaRaw)throw new Error('格式数据已在其他页面变化，请保留输入并重新打开最新记录。');
+      const nextRich={version:1,documents:rich.data.documents.filter(d=>d.recordId!==note.id)};
+      nextRich.documents.push({recordId:note.id,plainTextSnapshot:note.content,delta:prepared.delta,attachmentIds:window.LifeIdeasRich.refs(prepared.delta),updatedAt:Date.now()});
+      const richError=window.LifeIdeasRich.validate(nextRich,null,false);if(richError)throw new Error(richError);
+      const expected=Object.fromEntries([PERSONAL_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeIdeasRich.key].map(k=>[k,localStorage.getItem(k)]));
+      const committed=await window.LifeIdeasRich.commit([[PERSONAL_STORAGE_KEY,next],[NOTE_TAGS_KEY,nextTags],[window.LifeIdeasRich.key,nextRich]],writeStoreTransaction,{expected,clearRevision:prepared.revision,clearDraftSnapshot:prepared.draftSnapshot});
+
       personalData = next; noteTags = nextTags; if (!existing) diaryPage = 1; resetIdeaForm();
-      render(); toast('妙想已保存'); window.LifeIdeasUI.saved(note,!existing);
-    } finally { button.disabled = false; }
+      render(); toast(committed.warning?'妙想已保存；'+committed.warning:'妙想已保存',Boolean(committed.warning)); window.LifeIdeasUI.saved(note,!existing);
+    } catch(error) { $('#idea-status').textContent='保存失败：'+error.message; toast('妙想未能保存，输入仍保留',true); } finally { window.LifeIdeasEditor.setSaving(false); button.disabled = false; }
   }
 
   function deleteIdea(id) {
@@ -2919,14 +2964,14 @@
 
   function readIdeaDraft() {
     if(!noteEdit&&!noteFormChanged)return null;
-    return {edit:noteEdit,dirty:noteFormChanged,date:$('#diary-date').value,title:$('#diary-title-input').value,content:$('#diary-content-input').value,tags:[...pendingNoteTags],tagInput:$('#idea-tag-input').value};
+    return {edit:noteEdit,dirty:noteFormChanged,date:$('#diary-date').value,title:$('#diary-title-input').value,content:$('#diary-content-input').value,tags:[...pendingNoteTags],tagInput:$('#idea-tag-input').value,...(window.LifeIdeasEditor?.snapshot(noteEdit?.id||'new')||{})};
   }
 
   function restoreIdeaDraft(draft) {
     if(!draft||typeof draft.content!=='string'||!Array.isArray(draft.tags))return;
     noteEdit=draft.edit||null;noteFormChanged=Boolean(draft.dirty);pendingNoteTags=draft.tags.filter(t=>typeof t==='string');
     $('#diary-date').value=draft.date||today();$('#diary-title-input').value=draft.title||'';$('#diary-content-input').value=draft.content;$('#idea-tag-input').value=draft.tagInput||'';
-    $('#idea-submit').textContent=noteEdit?'保存修改':'保存妙想';$('#idea-edit-cancel').classList.toggle('hidden',!noteEdit&&!noteFormChanged);renderTagDraft();
+    $('#idea-submit').innerHTML=window.LifeIcons.render('check');$('#idea-edit-cancel').classList.toggle('hidden',!noteEdit&&!noteFormChanged);renderTagDraft();window.LifeIdeasEditor?.restore(draft);
   }
 
   let ideaDeleteBusy=false;
@@ -3013,6 +3058,8 @@
   }
 
   function primaryMobileTarget(target) {
+    if (window.LifeSocialUI.matches(target)) return '#social';
+    if (target === '#monthly') return '#personal';
     if (target.startsWith('#entry/')) {
       const source=history.state?.lifeReturn?.returnRoute;
       if (source && source!==target && !source.startsWith('#entry/')) return primaryMobileTarget(source);
@@ -3025,8 +3072,8 @@
     if (target === '#categories') return history.state?.lifeReturn?.returnRoute === '#settings' ? '#personal' : '#finance';
     if (target === '#bill/new') return '#finance';
     const financeView = window.LifeFinanceViews.match(target);
-    if (financeView) return financeView.primary || '#finance';
-    return ['#overview', '#finance', '#monthly', '#personal'].includes(target) ? target : '#overview';
+    if (financeView) return financeView.primary === '#monthly' ? '#personal' : financeView.primary || '#finance';
+    return ['#overview', '#finance', '#social', '#personal'].includes(target) ? target : '#overview';
   }
 
   function replaceUiRoute(target) {
@@ -3043,11 +3090,13 @@
     selectors.forEach((selector) => { const node = $(selector); if (node) scrollers[selector] = node.scrollTop; });
     const fields = {};
     ['selected-date','diary-filter','diary-filter-date','idea-query','idea-tag-filter','global-query','global-type','global-date','study-history-range','study-history-search','finance-period','insights-anchor','finance-category-type','finance-history-anchor','finance-history-range','finance-history-search','finance-history-start','finance-history-end','study-history-start','study-history-end'].forEach((id) => { if ($('#' + id)) fields[id] = $('#' + id).value; });
-    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, financeBreakdownOpen:$('.finance-breakdown').open, personalSummaryOpen:$('#personal-summary-detail').open, personalAboutOpen:$('#personal-about').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>Boolean(node.open)), ideas:window.LifeIdeasUI.snapshot(), schedule:window.LifeScheduleUI.snapshot(), learning:window.LifeLearningUI.snapshot() };
+    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, social:window.LifeSocialUI.snapshot(), personalSummaryOpen:$('#personal-summary-detail').open, personalAboutOpen:$('#personal-about').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>Boolean(node.open)), ideas:window.LifeIdeasUI.snapshot(), schedule:window.LifeScheduleUI.snapshot(), learning:window.LifeLearningUI.snapshot() };
   }
 
+  let ideaRestoreGeneration=0;
   function restoreUiView(view) {
     if (!view || typeof view !== 'object') return;
+    if (view.social) window.LifeSocialUI.restore(view.social);
     if (view.ideas) window.LifeIdeasUI.restore(view.ideas);
     if (view.insights) { insightsPeriod=view.insights.period; trendMetric=view.insights.metric; rankingType=view.insights.rankingType; }
     if (typeof view.statisticsOtherOpen === 'boolean') $('.statistics-other').open=view.statisticsOtherOpen;
@@ -3062,16 +3111,19 @@
     diaryPage = Number(view.diaryPage) || 1;
     searchPage = Number(view.searchPage) || 1;
     if (view.historyPages) Object.assign(historyPages, view.historyPages);
-    if (typeof view.financeBreakdownOpen === 'boolean') $('.finance-breakdown').open=view.financeBreakdownOpen;
     if (Array.isArray(view.personalPanels)) [...$('.personal-growth-grid').children].forEach((node,index)=>{if(node.tagName==='DETAILS')node.open=Boolean(view.personalPanels[index]);});
     $('#personal-summary-detail').open=typeof view.personalSummaryOpen==='boolean'?view.personalSummaryOpen:Boolean(view.personalPanels?.slice(0,2).some(Boolean));
     if(typeof view.personalAboutOpen==='boolean')$('#personal-about').open=view.personalAboutOpen;
     if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = selectedDate();
     if (!$('#task-id').value && !otherDraftForms.has('task-form')) $('#task-date').value = selectedDate();
     render();
+    const ideaRestore=++ideaRestoreGeneration,ideaRoute=location.hash,ideaActivity=window.LifeIdeasUI.activity();
     requestAnimationFrame(() => {
       window.scrollTo({ top: Number(view.scrollY) || 0, behavior: 'auto' });
       Object.entries(view.scrollers || {}).forEach(([selector, top]) => { const node = $(selector); if (node) node.scrollTop = Number(top) || 0; });
+      if(window.LifeIdeasUI.matches(ideaRoute))window.LifeIdeasRich.layoutReady().then(()=>requestAnimationFrame(()=>{
+        if(ideaRestore===ideaRestoreGeneration&&location.hash===ideaRoute&&ideaActivity===window.LifeIdeasUI.activity())$('#diary-list').scrollTop=Number(view.scrollers?.['#diary-list'])||0;
+      }));
     });
   }
 
@@ -3113,12 +3165,15 @@
     if ($('#schedule-repeat-dialog').open && target !== '#tasks') window.LifeUI.closeSheet($('#schedule-repeat-dialog'));
     if ($('#finance-filter-dialog').open && target !== '#finance') $('#finance-filter-dialog').close();
     if ($('#finance-more-dialog').open && target !== '#finance') $('#finance-more-dialog').close();
+    if ($('#finance-category-dialog').open && target !== '#finance') $('#finance-category-dialog').close();
     if ($('#insights-date-dialog').open && target !== '#monthly') $('#insights-date-dialog').close();
     const financeView = window.LifeFinanceViews.match(target);
+    const social = window.LifeSocialUI.matches(target);
     const entryRoute = target.startsWith('#entry/');
     const task = isTaskDetailRoute(target), note = isNoteRoute(target), goal = isGoalRoute(target), habit = isHabitRoute(target);
-    if (!routeSectionIds[target] && !entryRoute && !task && !note && !goal && !habit && !financeView) { replaceUiRoute('#overview'); return; }
+    if (!routeSectionIds[target] && !entryRoute && !task && !note && !goal && !habit && !financeView && !social) { replaceUiRoute('#overview'); return; }
     let base = target;
+    if (social) base = '#social';
     let financeViewTitle = '';
     if (financeView) {
       const view = window.LifeFinanceViews.renderRoute(target);
@@ -3148,11 +3203,11 @@
     });
     const routeBackbar = $('#route-backbar');
     $('.today-record-fab').classList.toggle('hidden', target !== '#overview');
-    const routeTitle = financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '日程', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '日程详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
-    const showRouteBack = !['#overview', '#records', '#finance', '#monthly', '#personal', '#bill/new'].includes(target);
+    const routeTitle = (social && target !== '#social' ? '帖子' : target === '#monthly' ? '统计' : '') || financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '日程', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '日程详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
+    const showRouteBack = !['#overview', '#records', '#finance', '#social', '#personal', '#bill/new'].includes(target);
     routeBackbar.classList.toggle('hidden', !showRouteBack);
     $('#route-back-title').textContent = routeTitle;
-    const fallback = financeView ? financeView.fallback : task ? '#tasks' : note || window.LifeIdeasUI.matches(target)&&target!=='#daily-notes' ? '#daily-notes' : goal ? '#goals' : habit ? '#habits' : entryRoute ? '#search' : ({ '#search':'#overview', '#daily-notes':'#records', '#habits':'#records', '#goals':'#records', '#learning':'#records', '#tasks':'#records', '#backup':'#personal', '#settings':'#personal', '#categories':'#finance', '#bill/new':'#finance' })[target] || '#overview';
+    const fallback = social ? '#social' : target === '#monthly' ? '#personal' : financeView ? financeView.fallback : task ? '#tasks' : note || window.LifeIdeasUI.matches(target)&&target!=='#daily-notes' ? '#daily-notes' : goal ? '#goals' : habit ? '#habits' : entryRoute ? '#search' : ({ '#search':'#overview', '#daily-notes':'#records', '#habits':'#records', '#goals':'#records', '#learning':'#records', '#tasks':'#records', '#backup':'#personal', '#settings':'#personal', '#categories':'#finance', '#bill/new':'#finance' })[target] || '#overview';
     routeBackbar.dataset.fallback = fallback;
     window.LifeUI.syncRoute(target, document.getElementById(visibleId));
     if (lastAnimatedSection !== target) {
@@ -3181,6 +3236,8 @@
       if (selected) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
     });
     document.body.classList.toggle('month-view', target === '#monthly');
+    document.body.classList.toggle('social-view', social);
+    window.LifeSocialUI.route(target);
     document.body.classList.toggle('finance-view', target === '#finance');
     document.body.classList.toggle('bill-sheet-open', target === '#bill/new');
     const dateSlot = ({ '#overview': '#overview-date-slot', '#learning': '#learning-date-slot', '#tasks': '#tasks-date-slot' })[target];
@@ -3257,8 +3314,6 @@
   $('#finance-editor').addEventListener('cancel', () => resetRecordForm('finance'));
   $('#diary-filter').addEventListener('change', () => { diaryPage = 1; renderDiary(); rememberView(); });
   $('#diary-filter-date').addEventListener('change', () => { diaryPage = 1; renderDiary(); rememberView(); });
-  $('#diary-prev').addEventListener('click', () => { diaryPage -= 1; renderDiary(); $('#diary-list').scrollTop = 0; rememberView(); });
-  $('#diary-next').addEventListener('click', () => { diaryPage += 1; renderDiary(); $('#diary-list').scrollTop = 0; rememberView(); });
   $('#insights-anchor').addEventListener('change', renderInsights);
   $('#insights-type').addEventListener('change',event=>{
     trendMetric=event.target.value;
@@ -3304,7 +3359,7 @@
     reveal:id=>{
       const filtered=Boolean($('#idea-query').value.trim()||$('#idea-tag-filter').value||$('#diary-filter').value==='date');
       $('#idea-query').value=$('#idea-tag-filter').value='';$('#diary-filter').value='all';
-      const rows=window.LifeIdeasUI.entries(personalData.diary);diaryPage=Math.floor(Math.max(0,rows.findIndex(n=>n.id===id))/10)+1;
+      diaryPage=1;
       $('#diary-list').scrollTop=0;if(filtered)toast('妙想已保存 · 已清除列表条件以显示新记录');
     },
   });
@@ -3328,6 +3383,7 @@
   $('#finance-month-cancel').addEventListener('click',()=>closeFinanceMonth(false));
   $('#finance-month-confirm').addEventListener('click',()=>closeFinanceMonth(true));
   $('#finance-month-dialog').addEventListener('cancel',event=>{event.preventDefault();closeFinanceMonth(false);});
+  window.LifeSocialUI.init({open:openUiPage,remember:rememberView,toast,profile:()=>personalData.profile});
   render();
   renderBillCategories();
   syncNavigation(window.location.hash || '#overview');

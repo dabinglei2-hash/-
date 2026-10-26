@@ -1,0 +1,3 @@
+# Keep bundled editor/OCR resources byte-for-byte consistent with MANIFEST.json.
+# Preserve upstream CRLF and blank EOF lines without treating them as project whitespace errors.
+/vendor/** -text whitespace=cr-at-eol,-blank-at-eof
