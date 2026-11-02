@@ -291,6 +291,26 @@
     }
   }
 
+  function saveHealth(next, expectedRaw) {
+    const current = window.LifeHealth.read(localStorage);
+    if (current.error) return current.error;
+    if (current.raw !== expectedRaw) return '健康数据已变化，未覆盖；输入仍保留，请重新核对。';
+    const error = window.LifeHealth.validate(next);
+    return error || writeStoreTransaction([[window.LifeHealth.key,next]]);
+  }
+
+  function saveNotes(next, expectedRaw) {
+    const current=window.LifeNotes.read(localStorage);
+    if(current.error)return current.error;
+    if(current.raw!==expectedRaw)return '笔记在其他页面变化，请核对最新内容；输入已保留。';
+    return window.LifeNotes.validate(next)||writeStoreTransaction([[window.LifeNotes.key,next]]);
+  }
+
+  function decodeRichBackup(backup) {
+    // Reuse the proven v9 media decoder without changing the old media format.
+    return window.LifeIdeasRich.decodeBackup(backup.schemaVersion>=10?{...backup,schemaVersion:9}:backup);
+  }
+
   function toast(message, error = false) {
     window.LifeUI.toast(message, error);
   }
@@ -501,7 +521,7 @@
   async function newLearningRecord(taskId) {
     if ((otherDraftForms.has('study-form') || recordEditors.study) && !await confirmAction('放弃当前学习编辑，打开新增记录？', '新增学习', '放弃并新增')) return;
     resetRecordForm('study'); window.LifeLearningUI.showRecords(true);
-    $('#study-date').value = taskId ? today() : selectedDate();
+    $('#study-date').value = taskId ? today() : learningDate();
     const task = data.tasks.find(row => row.id === taskId);
     if (task) {
       if (task.title.length <= 100) { $('#study-content').value = task.title; otherDraftForms.add('study-form'); }
@@ -570,6 +590,21 @@
   }
 
   function selectedDate() { return $('#selected-date').value || today(); }
+  // Independent view state, outside record models and strict JSON settings.
+  let learningViewDate = '', scheduleViewDate = '';
+  function learningDate() { return learningViewDate || selectedDate(); }
+  function scheduleDate() { return scheduleViewDate || selectedDate(); }
+  function chooseModuleDate(module, date) {
+    if (!isValidDate(date)) return;
+    if (module === 'learning') {
+      learningViewDate = date; historyPages.study = 1;
+      if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = date;
+    } else {
+      scheduleViewDate = date;
+      if (!$('#task-id').value && !otherDraftForms.has('task-form')) $('#task-date').value = date;
+    }
+    render(); rememberView();
+  }
   function onDate(items) { return items.filter((item) => item.date === selectedDate()); }
   function dailyRecordSnapshot(date, sourceData, sourcePersonal) {
     const log = (sourcePersonal.dailyLogs || []).find((entry) => entry.date === date) || null;
@@ -628,19 +663,22 @@
     $('#overview-income').textContent = finances.length ? money(income) : '—';
     $('#overview-expense').textContent = finances.length ? money(expense) : '—';
     $('#overview-balance').textContent = finances.length ? money(income - expense) : '—';
-    $('#study-total').textContent = `${studyMinutes} 分钟`;
-    $('#completion-percent').textContent = `${percent}%`;
-    $('#task-progress-bar').style.width = `${percent}%`;
-    $('#task-fraction').textContent = `${completed} / ${tasks.length} 项`;
-    $('#task-total').textContent = `${completed} / ${tasks.length} 项`;
-    $('#task-list-view .section-heading h2').textContent = (date === today() ? '今日' : '当日') + '安排';
-    $('#task-badge').textContent = countLabel(tasks.length, '项任务');
+    $('#study-total').textContent = `${data.studies.filter(item=>item.date===learningDate()).reduce((sum,item)=>sum+Number(item.duration||0),0)} 分钟`;
+    const scheduleTasks = data.tasks.filter(item=>item.date===scheduleDate());
+    const scheduleCompleted = scheduleTasks.filter(item=>item.completed).length;
+    const schedulePercent = scheduleTasks.length ? Math.round(scheduleCompleted/scheduleTasks.length*100) : 0;
+    $('#completion-percent').textContent = `${schedulePercent}%`;
+    $('#task-progress-bar').style.width = `${schedulePercent}%`;
+    $('#task-fraction').textContent = `${scheduleCompleted} / ${scheduleTasks.length} 项`;
+    $('#task-total').textContent = `${scheduleCompleted} / ${scheduleTasks.length} 项`;
+    $('#task-list-view .section-heading h2').textContent = (scheduleDate() === today() ? '今日' : '当日') + '安排';
+    $('#task-badge').textContent = countLabel(scheduleTasks.length, '项任务');
     $('#progress-title').textContent = tasks.length ? (completed === tasks.length ? '今天的任务都完成了' : `已经完成 ${completed} 项任务`) : '今天还没有任务';
     renderWorkspaceHome();
 
     renderHistory('study');
     renderHistory('finance');
-    renderTasks(tasks);
+    renderTasks(scheduleTasks);
     if (isTaskDetailRoute(window.location.hash)) {
       const taskId = taskIdFromRoute();
       if (!taskId || !renderTaskDetail(taskId)) routeToTaskList();
@@ -651,6 +689,8 @@
     renderInsights();
     renderCategories();
     window.LifeLearningUI.render();
+    window.LifeHealthUI.render();
+    window.LifeNotesUI.render();
     if (window.LifeFinanceViews.match(location.hash)) window.LifeFinanceViews.renderRoute(location.hash);
     const readErrors = [dataError, personalDataError, categoryError, noteTagsError, financeMetaError, scheduleMetaError, learningMetaError].filter(Boolean).join(' ');
     $('#app-status').textContent = readErrors;
@@ -884,7 +924,6 @@
     const finances = data.finances.filter((item) => item.date.slice(0, 7) === month);
     const income = centsTotal(finances, 'income'), expense = centsTotal(finances, 'expense');
     $('#finance-period-caption').textContent = '美元 USD';
-    $('#finance-avatar').textContent = Array.from(personalData.profile.nickname.trim() || '我')[0];
     $('#finance-income').textContent = finances.length ? money(income / 100) : '—';
     $('#finance-expense').textContent = finances.length ? money(expense / 100) : '—';
     $('#finance-balance').textContent = finances.length ? money((income - expense) / 100) : '—';
@@ -1301,7 +1340,7 @@
   }
 
   function validateBackup(backup) {
-    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6, 7, 8, 9].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
+    if (!isPlainObject(backup) || backup.format !== BACKUP_FORMAT || ![1, 2, 3, 4, BACKUP_VERSION, 6, 7, 8, 9, 10, 11].includes(backup.schemaVersion)) return '备份格式或版本不受支持。';
     const backupKeys = backup.schemaVersion === 1
       ? ['format', 'schemaVersion', 'exportedAt', 'data', 'settings']
       : backup.schemaVersion >= 4 ? ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'financeCategories', 'settings'] : ['format', 'schemaVersion', 'exportedAt', 'data', 'personal', 'settings'];
@@ -1309,7 +1348,9 @@
     if (backup.schemaVersion >= 6) backupKeys.push('financeMeta');
     if (backup.schemaVersion >= 7) backupKeys.push('scheduleMeta');
     if (backup.schemaVersion >= 8) backupKeys.push('learningMeta');
-    if (backup.schemaVersion === 9) backupKeys.push('ideasMeta','ideasAttachments','ideasDraft');
+    if (backup.schemaVersion >= 9) backupKeys.push('ideasMeta','ideasAttachments','ideasDraft');
+    if (backup.schemaVersion >= 10) backupKeys.push('health');
+    if (backup.schemaVersion === 11) backupKeys.push('notes');
     if (!hasExactKeys(backup, backupKeys)) return '文件不是有效的生活管理台备份。';
     if (typeof backup.exportedAt !== 'string' || !Number.isFinite(Date.parse(backup.exportedAt))) return '备份时间字段无效。';
     const dataError = validateData(backup.data);
@@ -1327,7 +1368,9 @@
     if (backup.schemaVersion >= 6) { const error = window.LifeFinanceMeta.validate(backup.financeMeta, backup.financeCategories, window.LifeIcons.names); if (error) return error; }
     if (backup.schemaVersion >= 7) { const error = window.LifeSchedule.validate(backup.scheduleMeta, backup.data.tasks); if (error) return error; }
     if (backup.schemaVersion >= 8) { const error = window.LifeLearning.validate(backup.learningMeta, backup.data, true); if (error) return error; }
-    if(backup.schemaVersion===9){const error=window.LifeIdeasRich.validate(backup.ideasMeta,backup.personal.diary);if(error)return error;if(!Array.isArray(backup.ideasAttachments))return '图片备份缺失。';}
+    if(backup.schemaVersion>=9){const error=window.LifeIdeasRich.validate(backup.ideasMeta,backup.personal.diary);if(error)return error;if(!Array.isArray(backup.ideasAttachments))return '图片备份缺失。';}
+    if(backup.schemaVersion>=10){const error=window.LifeHealth.validate(backup.health);if(error)return error;}
+    if(backup.schemaVersion===11){const error=window.LifeNotes.validate(backup.notes);if(error)return error;}
     const settingsKeys = backup.schemaVersion === 1
       ? ['selectedDate', 'monthYear', 'monthMonth']
       : backup.schemaVersion >= 4 ? ['selectedDate', 'monthYear', 'monthMonth', 'personalDate', 'financePeriod', 'insightsPeriod', 'insightsAnchor'] : ['selectedDate', 'monthYear', 'monthMonth', 'personalDate'];
@@ -1481,8 +1524,14 @@
     const learningMerge = storedLearning.error ? { error:storedLearning.error } : window.LifeLearning.merge(storedLearning.data, backup.learningMeta || window.LifeLearning.blank(), mergedCore);
     const storedIdeas=window.LifeIdeasRich.read(currentPersonal.diary);
     const ideasMerge=storedIdeas.error?{error:storedIdeas.error}:window.LifeIdeasRich.merge(storedIdeas.data,backup.ideasMeta||window.LifeIdeasRich.blank(),personalMerge.merged?.diary||currentPersonal.diary);
+    const storedHealth=backup.schemaVersion>=10?window.LifeHealth.read(localStorage):null;
+    const healthMerge=storedHealth?(storedHealth.error?{error:storedHealth.error}:window.LifeHealth.merge(storedHealth.data,backup.health)):{error:'',merged:null,additions:[],duplicates:0};
+    const storedNotes=backup.schemaVersion===11?window.LifeNotes.read(localStorage):null;
+    const notesMerge=storedNotes?(storedNotes.error?{error:storedNotes.error}:window.LifeNotes.merge(storedNotes.data,backup.notes)):{error:'',merged:null,additions:[],duplicates:0};
     return {
-      error: storedIdeas.error || ideasMerge.error || storedLearning.error || learningMerge.conflicts?.join('；') || dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error || scheduleMerge.error,
+      notes:notesMerge,
+      health:healthMerge,
+      error: notesMerge.error || healthMerge.error || storedIdeas.error || ideasMerge.error || storedLearning.error || learningMerge.conflicts?.join('；') || dataMerge.error || personalMerge.error || categoryMerge.error || referenceError || tagMerge.error || tagReferenceError || metaMerge.error || scheduleMerge.error,
       duplicates: dataMerge.duplicates + personalMerge.duplicates + categoryMerge.duplicates,
       additions: dataMerge.additions, personal: personalMerge, categories: categoryMerge, noteTags: tagMerge, financeMeta: metaMerge, scheduleMeta: scheduleMerge, learningMeta:learningMerge,ideasMeta:ideasMerge,
     };
@@ -1501,9 +1550,13 @@
     $('#backup-file-name').textContent = fileName;
     const meta = backup.financeMeta;
     $('#backup-meta-summary').textContent = meta ? '财务扩展：分类图标 ' + meta.categoryIcons.length + ' 项 · 预算 ' + meta.budgets.length + ' 项 · 资产/负债账户 ' + meta.accounts.length + ' 项（含归档）。' : '旧版备份：现有分类图标、预算与账户会保留。';
-    $('#backup-learning-summary').textContent = backup.learningMeta ? '学习扩展：目标 ' + backup.learningMeta.dailyGoals.length + ' 项 · 计划关联 ' + backup.learningMeta.plans.length + ' 项 · 计时 ' + backup.learningMeta.focusSessions.length + ' 次。运行计时以暂停副本恢复，需手动继续；冲突停止。' : '此版本不含学习扩展；当前目标、计划与计时将保留。完整备份请选择 v9。';
+    $('#backup-learning-summary').textContent = backup.learningMeta ? '学习扩展：目标 ' + backup.learningMeta.dailyGoals.length + ' 项 · 计划关联 ' + backup.learningMeta.plans.length + ' 项 · 计时 ' + backup.learningMeta.focusSessions.length + ' 次。运行计时以暂停副本恢复，需手动继续；冲突停止。' : '此版本不含学习扩展；当前目标、计划与计时将保留。完整备份请选择 v11。';
     $('#backup-schedule-summary').textContent = backup.scheduleMeta ? '日程扩展：备注/优先级/截止日 ' + backup.scheduleMeta.taskDetails.length + ' 条 · 重复规则 ' + backup.scheduleMeta.series.length + ' 项 · 实例标记 ' + backup.scheduleMeta.occurrences.length + ' 条；冲突停止。' : '此备份不含日程扩展；现有规则、备注与实例标记会保留。';
-    $('#backup-ideas-summary').textContent=backup.schemaVersion===9?'妙想：格式副本 '+backup.ideasMeta.documents.length+' 条 · 图片 '+backup.ideasAttachments.length+' 张 · 未保存草稿 '+(backup.ideasDraft?'1 份':'0 份')+'。冲突停止，不覆盖。':'此版本不含妙想格式、图片与持久草稿；当前扩展会保留。完整备份请选择 v9。';
+    $('#backup-ideas-summary').textContent=backup.schemaVersion>=9?'妙想：格式副本 '+backup.ideasMeta.documents.length+' 条 · 图片 '+backup.ideasAttachments.length+' 张 · 未保存草稿 '+(backup.ideasDraft?'1 份':'0 份')+'。冲突停止，不覆盖。':'此版本不含妙想格式、图片与持久草稿；当前扩展会保留。完整备份请选择 v11。';
+    if(!$('#backup-health-summary')){const row=document.createElement('p');row.id='backup-health-summary';row.className='subtle-copy';$('#backup-ideas-summary').after(row);}
+    if(!$('#backup-notes-summary')){const row=document.createElement('p');row.id='backup-notes-summary';row.className='subtle-copy';$('#backup-health-summary').after(row);}
+    $('#backup-notes-summary').textContent=backup.schemaVersion===11?'笔记：'+backup.notes.notes.length+' 条；新增 '+(analysis.notes.additions?.length||0)+'，重复 '+(analysis.notes.duplicates||0)+'。只恢复本地内容/缓存，不执行Notion写入；冲突停止。':'此版本不含独立笔记，现有笔记存储不变。完整备份请选择v11。';
+    $('#backup-health-summary').textContent=backup.schemaVersion>=10?'健康：'+backup.health.records.length+' 条；新增 '+(analysis.health.additions?.length||0)+' 条，重复跳过 '+(analysis.health.duplicates||0)+' 条；来源 '+[...new Set(backup.health.records.map(row=>row.source.name))].join('、')+'。同ID或测量身份冲突停止。':'此版本不含健康数据；现有健康存储不会改动。完整备份请选择 v11。';
     $('#backup-study-count').textContent = backup.data.studies.length;
     $('#backup-finance-count').textContent = backup.data.finances.length;
     $('#backup-task-count').textContent = backup.data.tasks.length;
@@ -1530,6 +1583,7 @@
   }
 
   function applyBackupSettings(settings) {
+    learningViewDate = scheduleViewDate = settings.selectedDate;
     $('#selected-date').value = settings.selectedDate;
     $('#study-date').value = settings.selectedDate;
     $('#finance-date').value = settings.selectedDate;
@@ -1552,10 +1606,10 @@
   }
 
   async function exportBackup(full = false) {
-    const button=full===9?$('#backup-export-ideas'):null;if(button?.disabled)return;if(button)button.disabled=true;
+    const button=full===11?$('#backup-export-notes'):full===10?$('#backup-export-health'):full===9?$('#backup-export-ideas'):null;if(button?.disabled)return;if(button)button.disabled=true;
     try {
-    const exportSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key].map(k=>[k,localStorage.getItem(k)]));
-    const version = full === 9 ? 9 : full === 8 ? 8 : full === 7 ? 7 : full ? 6 : 5;
+    const exportSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key,...(full>=10?[window.LifeHealth.key]:[]),...(full===11?[window.LifeNotes.key]:[])].map(k=>[k,localStorage.getItem(k)]));
+    const version = full === 11 ? 11 : full === 10 ? 10 : full === 9 ? 9 : full === 8 ? 8 : full === 7 ? 7 : full ? 6 : 5;
     const stored = readStoredDataForBackup();
     if (stored.error) { setBackupStatus(stored.error, 'error'); return; }
     const storedPersonal = readStoredPersonalForBackup();
@@ -1602,16 +1656,21 @@
       if (frozen.error) { setBackupStatus(frozen.error,'error'); return; }
       backup.schemaVersion = 8; backup.learningMeta = frozen.data;
     }
-    if(version===9){
+    if(version>=9){
       const rich=window.LifeIdeasRich.read(backup.personal.diary);if(rich.error)throw new Error(rich.error);
       backup.ideasMeta={version:1,documents:rich.data.documents.filter(d=>backup.personal.diary.some(n=>n.id===d.recordId))};
-      Object.assign(backup,await window.LifeIdeasRich.exportMedia(backup.ideasMeta));backup.schemaVersion=9;await window.LifeIdeasRich.decodeBackup(backup);
+      Object.assign(backup,await window.LifeIdeasRich.exportMedia(backup.ideasMeta));backup.schemaVersion=version;
+      if(version>=10){const health=window.LifeHealth.read(localStorage);if(health.error)throw new Error(health.error);backup.health=health.data;}
+      if(version===11){const notes=window.LifeNotes.read(localStorage);if(notes.error)throw new Error(notes.error);backup.notes=window.LifeNotes.exportData(notes.data);}
+      await decodeRichBackup(backup);
       if(Object.entries(exportSnapshot).some(([k,v])=>localStorage.getItem(k)!==v))throw new Error('导出期间数据发生变化，请重新导出以获得一致副本。');
     }
     const validation = validateBackup(backup);
     if (validation) { setBackupStatus(validation,'error'); return; }
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
     if(version===9&&blob.size>40*1024*1024)throw new Error('完整v9超过40MB，未生成截断备份。原数据保留。');
+    if(version===10&&blob.size>45*1024*1024)throw new Error('兼容v10超过45MiB，未生成截断备份。原数据保留。');
+    if(version===11&&blob.size>50*1024*1024)throw new Error('完整v11超过50MiB，未生成截断备份。原数据保留。');
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -1621,7 +1680,8 @@
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setBackupStatus((version===9 ? '完整 v9：含妙想格式、图片与草稿，以及原全部数据；运行计时副本已暂停。' : version === 8 ? '兼容 v8（不含妙想格式、图片与持久草稿）：包含学习、财务、日程扩展；运行计时的副本已暂停。' : version === 7 ? '日程 v7：不含学习扩展，完整备份请选择 v9。' : version === 6 ? '财务 v6：不含日程和学习扩展；完整备份请选择 v9。' : '兼容 v5：不含财务、日程和学习扩展；完整备份请选择 v9。') + (version<9?'此兼容版本不含妙想富文本、图片和持久草稿。':'') + `已发起 JSON 下载：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请在浏览器下载列表确认文件保存完成。`, 'success');
+    const coverage=version===11?'完整 v11：含独立笔记 '+backup.notes.notes.length+' 条、健康及原v10全部内容；恢复不写入Notion。':version===10?'兼容 v10（不含独立笔记）：含健康 '+backup.health.records.length+' 条、妙想图片/草稿及原全部数据。':version===9?'兼容 v9：含原生活数据及妙想扩展，不含健康。':'兼容 v'+version+'：不含健康，部分扩展不包含；完整备份请选择 v11。';
+    setBackupStatus(coverage+'运行计时仅在导出副本暂停。'+`已发起 JSON 下载：学习 ${backup.data.studies.length} 条、收支 ${backup.data.finances.length} 条、任务 ${backup.data.tasks.length} 条，并包含每日记录及个人空间数据。请在浏览器下载列表确认文件保存完成。`, 'success');
     $('#backup-session-info').textContent = '本次会话最近发起导出：' + new Date(backup.exportedAt).toLocaleString('zh-CN') + ' · JSON v' + backup.schemaVersion + '。这不是已验证的最近备份时间；刷新后不保留此提示。';
     } catch(error) { setBackupStatus('导出失败：'+error.message,'error'); } finally {if(button)button.disabled=false;}
   }
@@ -1631,11 +1691,13 @@
     $('#backup-preview').classList.add('hidden');
     setBackupStatus('');
     if (!file) return;
-    if (file.size > 40*1024*1024) { setBackupStatus('文件超过40MB，已拒绝读取。','error'); return; }
+    if (file.size > 50*1024*1024) { setBackupStatus('文件超过50MiB，已拒绝读取。','error'); return; }
     window.LifeUI.setBusy($('#backup-choose'), true);
     try {
       const backup = JSON.parse(await file.text());
-      if(backup.schemaVersion!==9&&file.size>MAX_BACKUP_BYTES){setBackupStatus('旧版备份不能超过10MB。','error');return;}
+      if(backup.schemaVersion<9&&file.size>MAX_BACKUP_BYTES){setBackupStatus('旧版备份不能超过10MB。','error');return;}
+      if(backup.schemaVersion===10&&file.size>45*1024*1024){setBackupStatus('兼容v10不能超过45MiB。','error');return;}
+      if(backup.schemaVersion===9&&file.size>40*1024*1024){setBackupStatus('兼容v9不能超过40MiB。','error');return;}
       const error = validateBackup(backup);
       if (error) { setBackupStatus(`备份文件无效：${error}`, 'error'); return; }
       if (backup.schemaVersion === 1) {
@@ -1648,7 +1710,7 @@
       if (stored.error) { setBackupStatus(stored.error, 'error'); return; }
       const storedPersonal = readStoredPersonalForBackup();
       if (storedPersonal.error) { setBackupStatus(storedPersonal.error, 'error'); return; }
-      if(backup.schemaVersion===9){const decoded=await window.LifeIdeasRich.decodeBackup(backup);await window.LifeIdeasRich.mediaConflict(decoded);}
+      if(backup.schemaVersion>=9){const decoded=await decodeRichBackup(backup);await window.LifeIdeasRich.mediaConflict(decoded);}
       const analysis = analyzeCompleteMerge(stored.data, storedPersonal.data, backup);
       showBackupPreview(file.name, backup, analysis);
       if (analysis.error) setBackupStatus(analysis.error, 'error');
@@ -1665,7 +1727,7 @@
     const importCandidate=pendingBackup;
     if (!await confirmAction('将按预览摘要安全合并备份；相同记录会跳过，冲突记录不会覆盖。', '确认恢复备份', '确认合并')) return;
     if (pendingBackup!==importCandidate) {setBackupStatus('预览文件已改变，请重新核对摘要后确认。','error');return;}
-    const importSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key].map(k=>[k,localStorage.getItem(k)]));
+    const importSnapshot=Object.fromEntries([STORAGE_KEY,PERSONAL_STORAGE_KEY,CATEGORY_STORAGE_KEY,NOTE_TAGS_KEY,window.LifeFinanceMeta.key,window.LifeSchedule.key,window.LifeLearning.key,window.LifeIdeasRich.key,...(importCandidate.schemaVersion>=10?[window.LifeHealth.key]:[]),...(importCandidate.schemaVersion===11?[window.LifeNotes.key]:[])].map(k=>[k,localStorage.getItem(k)]));
     const stored = readStoredDataForBackup(), storedPersonal = readStoredPersonalForBackup();
     if (stored.error || storedPersonal.error) { setBackupStatus(stored.error || storedPersonal.error, 'error'); return; }
     const analysis = analyzeCompleteMerge(stored.data, storedPersonal.data, importCandidate);
@@ -1695,11 +1757,16 @@
     const keepLearning = window.LifeLearning.hasData(analysis.learningMeta.merged) || localStorage.getItem(window.LifeLearning.key) !== null;
     if (keepLearning) entries.push([window.LifeLearning.key,analysis.learningMeta.merged]);
     if(analysis.ideasMeta.merged.documents.length||localStorage.getItem(window.LifeIdeasRich.key)!==null)entries.push([window.LifeIdeasRich.key,analysis.ideasMeta.merged]);
+    if(importCandidate.schemaVersion>=10&&(analysis.health.merged.records.length||localStorage.getItem(window.LifeHealth.key)!==null)){
+      if(analysis.health.additions.length)analysis.health.merged.lastImportAt=Date.now();
+      entries.push([window.LifeHealth.key,analysis.health.merged]);
+    }
+    if(importCandidate.schemaVersion===11&&(analysis.notes.merged.notes.length||localStorage.getItem(window.LifeNotes.key)!==null))entries.push([window.LifeNotes.key,analysis.notes.merged]);
     $('#backup-import-confirm').disabled=true;
     $('#backup-choose').disabled=true;$('#backup-file').disabled=true;
     let importWarning='';
     try{
-      if(importCandidate.schemaVersion===9){const decoded=await window.LifeIdeasRich.decodeBackup(importCandidate);await window.LifeIdeasRich.mediaConflict(decoded);const draftExpected=JSON.stringify(await window.LifeIdeasRich.get('drafts','current')||null);const result=await window.LifeIdeasRich.commit(entries,writeStoreTransaction,{expected:importSnapshot,assets:decoded.assets,draft:decoded.draft,draftExpected});importWarning=result.warning;}
+      if(importCandidate.schemaVersion>=9){const decoded=await decodeRichBackup(importCandidate);await window.LifeIdeasRich.mediaConflict(decoded);const draftExpected=JSON.stringify(await window.LifeIdeasRich.get('drafts','current')||null);const result=await window.LifeIdeasRich.commit(entries,writeStoreTransaction,{expected:importSnapshot,assets:decoded.assets,draft:decoded.draft,draftExpected});importWarning=result.warning;}
       else{const error=writeStoreTransaction(entries);if(error)throw new Error(error);}
     }catch(error){setBackupStatus('恢复未完成：'+error.message,'error');$('#backup-import-confirm').disabled=false;return;}
     finally{$('#backup-choose').disabled=false;$('#backup-file').disabled=false;}
@@ -1747,7 +1814,7 @@
     const range = $(`${prefix}range`).value;
     $(`${prefix}dates`).classList.toggle('hidden', range !== 'custom');
     const result = window.LifeHistory.select(type === 'study' ? data.studies : data.finances, {
-      type, anchor: type === 'finance' ? ($('#finance-history-anchor').value || today()) : selectedDate(), range, start: $(`${prefix}start`).value,
+      type, anchor: type === 'finance' ? ($('#finance-history-anchor').value || today()) : learningDate(), range, start: $(`${prefix}start`).value,
       end: $(`${prefix}end`).value, query: $(`${prefix}search`).value, page: historyPages[type],
       paginate: type !== 'finance',
     });
@@ -1778,8 +1845,8 @@
     for (const field of ['range', 'start', 'end', 'search']) {
       $(`${prefix}${field}`).addEventListener(field === 'search' ? 'input' : 'change', () => {
         if (field === 'range' && $(`${prefix}range`).value === 'custom') {
-          if (!$(`${prefix}start`).value) $(`${prefix}start`).value = selectedDate();
-          if (!$(`${prefix}end`).value) $(`${prefix}end`).value = selectedDate();
+          if (!$(`${prefix}start`).value) $(`${prefix}start`).value = type === 'study' ? learningDate() : selectedDate();
+          if (!$(`${prefix}end`).value) $(`${prefix}end`).value = type === 'study' ? learningDate() : selectedDate();
         }
         historyPages[type] = 1;
         renderHistory(type);
@@ -1801,7 +1868,7 @@
   }
 
   function renderTasks(items) {
-    window.LifeScheduleUI.render(items, data.tasks, scheduleMeta, selectedDate());
+    window.LifeScheduleUI.render(items, data.tasks, scheduleMeta, scheduleDate());
   }
 
   const compareTaskOrder = (a, b) => (a.start || '99:99').localeCompare(b.start || '99:99') || a.createdAt - b.createdAt;
@@ -1827,7 +1894,8 @@
       .map((link) => link.dataset.openTask)
       .filter((id) => data.tasks.some((task) => task.id === id));
     if (!taskIds.includes(taskId)) {
-      taskIds = data.tasks.filter((task) => task.date === selectedDate()).slice().sort(compareTaskOrder).map((task) => task.id);
+      const sourceDate = returnRoute === '#tasks' ? scheduleDate() : returnRoute === '#learning' ? learningDate() : selectedDate();
+      taskIds = data.tasks.filter((task) => task.date === sourceDate).slice().sort(compareTaskOrder).map((task) => task.id);
     }
     if (!taskIds.includes(taskId)) taskIds.push(taskId);
     const context = {
@@ -1916,7 +1984,7 @@
 
   function restoreTaskSource(context) {
     data = loadData();
-    if (context.selectedDate && context.selectedDate !== selectedDate()) {
+    if (!context.viewSnapshot && context.selectedDate && context.selectedDate !== selectedDate()) {
       $('#selected-date').value = context.selectedDate;
       if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = context.selectedDate;
       if (!recordEditors.finance) $('#finance-date').value = context.selectedDate;
@@ -1941,7 +2009,7 @@
   function resetTaskForm() {
     $('#task-form').reset();
     $('#task-id').value = '';
-    $('#task-date').value = selectedDate();
+    $('#task-date').value = scheduleDate();
     taskEditExpected = null;
     $('#task-form-title').textContent = '添加日程';
     $('#task-priority').value = '';
@@ -1962,7 +2030,7 @@
   function resetRecordForm(type) {
     recordEditors[type] = null;
     $(`#${type}-form`).reset();
-    $(`#${type}-date`).value = selectedDate();
+    $(`#${type}-date`).value = type === 'study' ? learningDate() : selectedDate();
     $(`#${type}-form-title`).textContent = type === 'study' ? '添加学习记录' : '新增一笔收支';
     $(`#${type}-form-description`).textContent = type === 'study' ? '每次学习都可以单独记一条' : '这是独立流水，与今日记录编辑分开';
     $(`#${type}-submit`).innerHTML = type === 'study' ? '添加学习记录 <span><span data-icon="add"></span></span>' : '新增收支流水 <span><span data-icon="add"></span></span>';
@@ -1976,7 +2044,6 @@
     $('#selected-date').value = date;
     if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = date;
     if (!recordEditors.finance && !otherDraftForms.has('finance-form')) $('#finance-date').value = date;
-    $('#task-date').value = date;
     fillDailyRecordForm(date);
     if ($('#finance-editor').open) window.LifeUI.closeSheet($('#finance-editor'));
     openUiPage('#today-record');
@@ -2077,9 +2144,7 @@
   $('#selected-date').addEventListener('change', (event) => {
     historyPages.study = historyPages.finance = 1;
     const date = event.target.value || today();
-    if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = date;
     if (!recordEditors.finance) $('#finance-date').value = date;
-    if (!otherDraftForms.has('task-form')) $('#task-date').value = date;
     fillDailyRecordForm(date);
     render();
     rememberView();
@@ -2248,7 +2313,9 @@
   $('#backup-export-full').addEventListener('click', () => exportBackup(true));
   $('#backup-export-schedule').addEventListener('click', () => exportBackup(7));
   $('#backup-export-learning').addEventListener('click', () => exportBackup(8));
-  $('#backup-before-restore').addEventListener('click', () => exportBackup(9));
+  $('#backup-before-restore').addEventListener('click', () => exportBackup(11));
+  $('#backup-export-notes').addEventListener('click', () => exportBackup(11));
+  $('#backup-export-health').addEventListener('click', () => exportBackup(10));
   $('#backup-export-ideas').addEventListener('click', () => exportBackup(9));
   $('#backup-choose').addEventListener('click', () => $('#backup-file').click());
   $('#backup-file').addEventListener('change', (event) => {
@@ -2311,7 +2378,7 @@
     event.preventDefault();
     const title = $('#quick-task-title').value.trim();
     if (!title) return;
-    const task = { id: makeId(), date: selectedDate(), title, start: '', end: '', completed: false, createdAt: Date.now() };
+    const task = { id: makeId(), date: scheduleDate(), title, start: '', end: '', completed: false, createdAt: Date.now() };
     data.tasks.push(task);
     if (saveData()) {
       populateMonthYears();
@@ -2717,7 +2784,7 @@
         if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
         event.preventDefault(); openUiPage(route);
         if(key==='growth'){
-          $('#selected-date').value=today(); $('#selected-date').dispatchEvent(new Event('change'));
+          chooseModuleDate('learning',today());
           window.LifeLearningUI.restore({view:'stats'}); window.LifeLearningUI.render();
         }else{
           $('#finance-period').value=today().slice(0,7); $('#finance-period').dispatchEvent(new Event('change'));
@@ -2734,8 +2801,9 @@
     $('.wealth-panel').append(monthCopy);
     const wealthRule=document.createElement('p'); wealthRule.className='subtle-copy'; wealthRule.textContent='累计净结余＝全部收入－全部支出；不同于账户余额或资产总额。财富目标由你手动设置。'; $('.wealth-panel').append(wealthRule);
     const about=document.createElement('details'); about.id='personal-about'; about.className='personal-about compose-details';
-    about.innerHTML='<summary>关于 Life OS <small>本地网页 · JSON v8</small></summary><p class="subtle-copy">仅在当前浏览器来源保存，没有云端账户同步或自动备份。</p><a class="text-button" href="#settings" data-open-page>查看应用与数据说明</a>';
+    about.innerHTML='<summary>关于 Life OS <small>本地网页 · JSON v11</small></summary><p class="subtle-copy">生活记录保存在当前浏览器来源；笔记仅主动同步至授权Notion，没有自动备份。</p>';
     cumulative.after(about);
+    const dataHelp=document.createElement('a');dataHelp.id='personal-data-help';dataHelp.className='text-button';dataHelp.href='#settings';dataHelp.dataset.openPage='';dataHelp.textContent='查看应用与数据说明';about.after(dataHelp);
     $('#home-date-open').addEventListener('click', () => {
       $('#overview-date-slot').append($('.date-control'));
       $('#home-date-dialog').showModal();
@@ -2836,9 +2904,11 @@
         event.preventDefault();
         const date = selectedDate();
         if (card.dataset.homeCard === 'note') { clearIdeaFilters(); $('#diary-filter').value = 'date'; $('#diary-filter-date').value = date; if (!noteFormChanged && !noteEdit) $('#diary-date').value = date; diaryPage = 1; renderDiary(); }
-        if (card.dataset.homeCard === 'study') { window.LifeLearningUI.home(); $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study = 1; renderHistory('study'); }
+        if (card.dataset.homeCard === 'study') { learningViewDate=date; window.LifeLearningUI.home(); $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study = 1; renderHistory('study'); }
         if (card.dataset.homeCard === 'finance') { $('#finance-period').value = date.slice(0,7); $('#finance-history-anchor').value = date; $('#finance-history-range').value = 'selected'; $('#finance-history-search').value = ''; historyPages.finance = 1; renderHistory('finance'); renderFinanceOverview(); }
-        if (card.dataset.homeCard === 'task') { window.LifeScheduleUI.restore({ view:'day', month:date.slice(0,7), status:'all', scope:'selected' }); renderTasks(data.tasks.filter(task=>task.date===date)); }
+        if (card.dataset.homeCard === 'task') { scheduleViewDate=date; window.LifeScheduleUI.restore({ view:'day', month:date.slice(0,7), status:'all', scope:'selected' }); renderTasks(data.tasks.filter(task=>task.date===date)); }
+        if (card.dataset.homeCard === 'health') window.LifeHealthUI.chooseDate(date);
+        if (card.dataset.homeCard === 'habits') { $('#personal-date').value = date; renderHabits(); }
         openUiPage(card.getAttribute('href')); return;
       }
       const remove = event.target.closest('[data-remove-note-tag]');
@@ -2869,6 +2939,13 @@
     $('#overview-balance').textContent = finances.length ? money((centsTotal(finances, 'income') - centsTotal(finances, 'expense')) / 100) : '—';
     $('.today-record-fab').setAttribute('aria-label', date === today() ? '记录今天' : '记录当日');
     $('.today-record-fab').title = date === today() ? '记录今天' : '记录当日';
+    window.LifeHealthUI.renderHomeCard(date);
+    window.LifeNotesUI.renderHomeCard();
+    $('#home-habits-completed').textContent = personalDataError ? '—' : personalData.habits.filter(habit=>habit.checkedDates.includes(date)).length;
+    $('#home-habits-summary').textContent = personalDataError ? '个人数据暂不可读取' : scope + ' · 共 ' + personalData.habits.length + ' 项习惯';
+    const goalsCompleted = personalData.goals.filter(goal=>goal.completed).length;
+    $('#home-goals-active').textContent = personalDataError ? '—' : personalData.goals.length - goalsCompleted;
+    $('#home-goals-summary').textContent = personalDataError ? '个人数据暂不可读取' : goalsCompleted + ' 项已完成 · 全部目标';
   }
 
   function renderTagDraft() {
@@ -3051,13 +3128,16 @@
     const row = (type === 'study' ? data.studies : data.finances).find((item) => item.id === id);
     if (!row) { toast('记录已不存在。',true); return; }
     if (type === 'study') {
-      $('#selected-date').value = row.date; $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study=1; window.LifeLearningUI.showRecords(); render(); openUiPage('#learning');
+      learningViewDate = row.date; $('#study-history-range').value = 'selected'; $('#study-history-search').value = ''; historyPages.study=1; window.LifeLearningUI.showRecords(); render(); openUiPage('#learning');
     } else {
       $('#finance-period').value = row.date.slice(0,7); $('#finance-history-anchor').value = row.date; $('#finance-history-range').value = 'selected'; $('#finance-history-search').value = ''; historyPages.finance=1; render(); openUiPage('#finance');
     }
   }
 
   function primaryMobileTarget(target) {
+    if (['#habits','#goals'].includes(target) || isHabitRoute(target) || isGoalRoute(target)) return '#overview';
+    if (window.LifeNotesUI.matches(target)) return '#overview';
+    if (window.LifeHealthUI.matches(target)) return '#overview';
     if (window.LifeSocialUI.matches(target)) return '#social';
     if (target === '#monthly') return '#personal';
     if (target.startsWith('#entry/')) {
@@ -3085,18 +3165,20 @@
   }
 
   function captureUiView() {
-    const selectors = ['#overview-section', '#diary-list', '#habit-list', '#goal-current-list', '#finance', '#finance .table-wrap', '#task-list', '#global-results', '#finance-detail-list', '#learning-plan-list', '#learning .table-wrap'];
+    const selectors = ['#overview-section', '#diary-list', '#habit-list', '#goal-current-list', '#finance', '#finance .table-wrap', '#task-list', '#global-results', '#finance-detail-list', '#learning-plan-list', '#learning .table-wrap','#health-history-list','#notes-list'];
     const scrollers = {};
     selectors.forEach((selector) => { const node = $(selector); if (node) scrollers[selector] = node.scrollTop; });
     const fields = {};
     ['selected-date','diary-filter','diary-filter-date','idea-query','idea-tag-filter','global-query','global-type','global-date','study-history-range','study-history-search','finance-period','insights-anchor','finance-category-type','finance-history-anchor','finance-history-range','finance-history-search','finance-history-start','finance-history-end','study-history-start','study-history-end'].forEach((id) => { if ($('#' + id)) fields[id] = $('#' + id).value; });
-    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, social:window.LifeSocialUI.snapshot(), personalSummaryOpen:$('#personal-summary-detail').open, personalAboutOpen:$('#personal-about').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>Boolean(node.open)), ideas:window.LifeIdeasUI.snapshot(), schedule:window.LifeScheduleUI.snapshot(), learning:window.LifeLearningUI.snapshot() };
+    return { scrollY: window.scrollY, scrollers, diaryPage, searchPage, fields, notes:window.LifeNotesUI.snapshot(), health:window.LifeHealthUI.snapshot(), historyPages: { ...historyPages }, insights: {period:insightsPeriod,metric:trendMetric,rankingType}, statisticsOtherOpen:$('.statistics-other').open, monthlyLegacyOpen:$('#monthly-legacy-detail').open, social:window.LifeSocialUI.snapshot(), personalSummaryOpen:$('#personal-summary-detail').open, personalAboutOpen:$('#personal-about').open, personalPanels:[...$('.personal-growth-grid').children].map(node=>Boolean(node.open)), ideas:window.LifeIdeasUI.snapshot(), schedule:window.LifeScheduleUI.snapshot(), learning:window.LifeLearningUI.snapshot() };
   }
 
   let ideaRestoreGeneration=0;
   function restoreUiView(view) {
     if (!view || typeof view !== 'object') return;
     if (view.social) window.LifeSocialUI.restore(view.social);
+    if (view.health) window.LifeHealthUI.restore(view.health);
+    if (view.notes) window.LifeNotesUI.restore(view.notes);
     if (view.ideas) window.LifeIdeasUI.restore(view.ideas);
     if (view.insights) { insightsPeriod=view.insights.period; trendMetric=view.insights.metric; rankingType=view.insights.rankingType; }
     if (typeof view.statisticsOtherOpen === 'boolean') $('.statistics-other').open=view.statisticsOtherOpen;
@@ -3114,8 +3196,8 @@
     if (Array.isArray(view.personalPanels)) [...$('.personal-growth-grid').children].forEach((node,index)=>{if(node.tagName==='DETAILS')node.open=Boolean(view.personalPanels[index]);});
     $('#personal-summary-detail').open=typeof view.personalSummaryOpen==='boolean'?view.personalSummaryOpen:Boolean(view.personalPanels?.slice(0,2).some(Boolean));
     if(typeof view.personalAboutOpen==='boolean')$('#personal-about').open=view.personalAboutOpen;
-    if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = selectedDate();
-    if (!$('#task-id').value && !otherDraftForms.has('task-form')) $('#task-date').value = selectedDate();
+    if (!recordEditors.study && !otherDraftForms.has('study-form')) $('#study-date').value = learningDate();
+    if (!$('#task-id').value && !otherDraftForms.has('task-form')) $('#task-date').value = scheduleDate();
     render();
     const ideaRestore=++ideaRestoreGeneration,ideaRoute=location.hash,ideaActivity=window.LifeIdeasUI.activity();
     requestAnimationFrame(() => {
@@ -3134,7 +3216,7 @@
     const previous = history.state && typeof history.state === 'object' ? history.state : {};
     history.replaceState({ ...previous, viewSnapshot }, '', window.location.href);
     const context = { returnRoute: source, site: 'my-life-dashboard' };
-    history.pushState({ lifeReturn: context, homeDate: selectedDate(), ideaContext:window.LifeIdeasUI.isIdeas(target)?window.LifeIdeasUI.snapshot():undefined, viewSnapshot:window.LifeIdeasUI.matches(target)?viewSnapshot:undefined, uiDepth: (Number(history.state?.uiDepth) || 0) + 1 }, '', window.location.pathname + window.location.search + target);
+    history.pushState({ lifeReturn: context, homeDate: selectedDate(), ideaContext:window.LifeIdeasUI.isIdeas(target)?window.LifeIdeasUI.snapshot():undefined, viewSnapshot:window.LifeIdeasUI.matches(target)?viewSnapshot:['#learning','#tasks','#social/search'].includes(target)||window.LifeHealthUI.matches(target)||window.LifeNotesUI.matches(target)?{...viewSnapshot,scrollY:0,scrollers:{}}:undefined, uiDepth: (Number(history.state?.uiDepth) || 0) + 1 }, '', window.location.pathname + window.location.search + target);
     activeUiReturn = context;
     if (target === '#bill/new') billSheetReturnFocus = document.activeElement;
     runPageTransition(() => { syncNavigation(target); window.scrollTo({ top: 0, behavior: 'auto' }); });
@@ -3169,11 +3251,15 @@
     if ($('#insights-date-dialog').open && target !== '#monthly') $('#insights-date-dialog').close();
     const financeView = window.LifeFinanceViews.match(target);
     const social = window.LifeSocialUI.matches(target);
+    const health = window.LifeHealthUI.matches(target);
+    const notes = window.LifeNotesUI.matches(target);
     const entryRoute = target.startsWith('#entry/');
     const task = isTaskDetailRoute(target), note = isNoteRoute(target), goal = isGoalRoute(target), habit = isHabitRoute(target);
-    if (!routeSectionIds[target] && !entryRoute && !task && !note && !goal && !habit && !financeView && !social) { replaceUiRoute('#overview'); return; }
+    if (!routeSectionIds[target] && !entryRoute && !task && !note && !goal && !habit && !financeView && !social && !health && !notes) { replaceUiRoute('#overview'); return; }
     let base = target;
     if (social) base = '#social';
+    if (health) base = '#health';
+    if (notes) base = '#notes';
     let financeViewTitle = '';
     if (financeView) {
       const view = window.LifeFinanceViews.renderRoute(target);
@@ -3203,12 +3289,12 @@
     });
     const routeBackbar = $('#route-backbar');
     $('.today-record-fab').classList.toggle('hidden', target !== '#overview');
-    const routeTitle = (social && target !== '#social' ? '帖子' : target === '#monthly' ? '统计' : '') || financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '日程', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '日程详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
+    const routeTitle = (social && target !== '#social' ? (target === '#social/search' ? '搜索社交' : '帖子') : target === '#monthly' ? '统计' : '') || financeViewTitle || ({ '#search': '搜索', '#daily-notes': '妙想', '#habits': '习惯', '#learning': '学习', '#tasks': '日程', '#goals': '长期目标', '#backup': '数据备份', '#settings': '设置', '#categories': '分类管理', '#bill/new': '新增收支' })[target] || (task ? '日程详情' : target === '#today-record' ? '今日回顾' : note ? '妙想详情' : goal ? '目标详情' : habit ? '习惯详情' : entryRoute ? '记录详情' : '');
     const showRouteBack = !['#overview', '#records', '#finance', '#social', '#personal', '#bill/new'].includes(target);
     routeBackbar.classList.toggle('hidden', !showRouteBack);
-    $('#route-back-title').textContent = routeTitle;
-    const fallback = social ? '#social' : target === '#monthly' ? '#personal' : financeView ? financeView.fallback : task ? '#tasks' : note || window.LifeIdeasUI.matches(target)&&target!=='#daily-notes' ? '#daily-notes' : goal ? '#goals' : habit ? '#habits' : entryRoute ? '#search' : ({ '#search':'#overview', '#daily-notes':'#records', '#habits':'#records', '#goals':'#records', '#learning':'#records', '#tasks':'#records', '#backup':'#personal', '#settings':'#personal', '#categories':'#finance', '#bill/new':'#finance' })[target] || '#overview';
-    routeBackbar.dataset.fallback = fallback;
+    $('#route-back-title').textContent = notes ? ({'#notes':'笔记','#notes/new':'新建笔记','#notes/data':'笔记备份','#notes/setup':'连接Notion'})[target] || (target.startsWith('#notes/edit/')?'编辑笔记':'笔记详情') : health ? ({'#health':'健康','#health/history':'健康历史','#health/data':'健康数据','#health/demo':'健康演示'})[target] || '健康记录' : routeTitle;
+    const fallback = social ? '#social' : target === '#monthly' ? '#personal' : financeView ? financeView.fallback : task ? '#tasks' : note || window.LifeIdeasUI.matches(target)&&target!=='#daily-notes' ? '#daily-notes' : goal ? '#goals' : habit ? '#habits' : entryRoute ? '#search' : ({ '#search':'#overview', '#daily-notes':'#records', '#habits':'#overview', '#goals':'#overview', '#learning':'#records', '#tasks':'#records', '#backup':'#personal', '#settings':'#personal', '#categories':'#finance', '#bill/new':'#finance' })[target] || '#overview';
+    routeBackbar.dataset.fallback = notes ? target==='#notes'?'#overview':'#notes' : health ? target==='#health'?'#overview':'#health' : fallback;
     window.LifeUI.syncRoute(target, document.getElementById(visibleId));
     if (lastAnimatedSection !== target) {
       const visibleSection = document.getElementById(visibleId);
@@ -3238,9 +3324,11 @@
     document.body.classList.toggle('month-view', target === '#monthly');
     document.body.classList.toggle('social-view', social);
     window.LifeSocialUI.route(target);
+    window.LifeHealthUI.route(target);
+    window.LifeNotesUI.route(target);
     document.body.classList.toggle('finance-view', target === '#finance');
     document.body.classList.toggle('bill-sheet-open', target === '#bill/new');
-    const dateSlot = ({ '#overview': '#overview-date-slot', '#learning': '#learning-date-slot', '#tasks': '#tasks-date-slot' })[target];
+    const dateSlot = target === '#overview' ? '#overview-date-slot' : null;
     if (dateSlot && $(dateSlot)) $(dateSlot).append($('.date-control'));
     else $('#date-control-parking').append($('.date-control'));
     if (target === '#bill/new') { renderBillCategories(); requestAnimationFrame(() => window.LifeFinanceViews.billFocus()?.focus({ preventScroll: true })); }
@@ -3270,6 +3358,8 @@
       if (taskContext && target === taskContext.returnRoute) restoreTaskSource(taskContext);
       activeTaskNavigation = null;
       if (history.state?.viewSnapshot) restoreUiView(history.state.viewSnapshot);
+      else if(window.LifeNotesUI.matches(target)){window.scrollTo({top:0,behavior:'auto'});rememberView();}
+      else if (['#learning','#tasks','#social/search'].includes(target)||window.LifeHealthUI.matches(target)) rememberView();
       window.LifeIdeasUI.finishNavigation();
       if (closingBillSheet && billSheetReturnFocus instanceof HTMLElement) requestAnimationFrame(() => billSheetReturnFocus.focus({ preventScroll: true }));
       if (closingBillSheet) { $('#bill-section').classList.remove('bill-sheet-closing'); billClosePending = false; }
@@ -3333,6 +3423,8 @@
   const directTask = data.tasks.find(task => task.id === taskIdFromRoute());
   const startingDate = isValidDate(history.state?.viewSnapshot?.fields?.['selected-date']) ? history.state.viewSnapshot.fields['selected-date'] : isValidDate(history.state?.homeDate) ? history.state.homeDate : directTask?.date || today();
   setFormDates(startingDate);
+  learningViewDate = isValidDate(history.state?.viewSnapshot?.learning?.date) ? history.state.viewSnapshot.learning.date : startingDate;
+  scheduleViewDate = isValidDate(history.state?.viewSnapshot?.schedule?.date) ? history.state.viewSnapshot.schedule.date : directTask?.date || startingDate;
   $('#finance-period').value = today().slice(0, 7);
   $('#finance-history-anchor').value = today();
   $('#bill-date').value = today();
@@ -3364,18 +3456,16 @@
     },
   });
   window.LifeScheduleUI.init({
-    date:selectedDate, today, makeId, meta:()=>scheduleMeta, refresh:render, remember:rememberView,
-    chooseDate:date=>{
-      if (!isValidDate(date)) return;
-      $('#selected-date').value=date; $('#selected-date').dispatchEvent(new Event('change'));
-      history.replaceState({ ...(history.state || {}), homeDate:date }, '', location.href); rememberView();
-    },
+    date:scheduleDate, today, makeId, meta:()=>scheduleMeta, refresh:render, remember:rememberView,
+    chooseDate:date=>chooseModuleDate('schedule',date),
+    restoreDate:date=>{if(isValidDate(date)&&location.hash==='#tasks')scheduleViewDate=date;},
     saveSeries:saveScheduleSeries, generate:generateScheduleSeries, toggleSeries:toggleScheduleSeries,
     confirm:confirmAction, hasDraft:id=>otherDraftForms.has(id), clearDraft:id=>otherDraftForms.delete(id),
   });
   window.LifeLearningUI.init({
-    date:selectedDate, today, read:()=>({data,meta:learningMeta,schedule:scheduleMeta}), remember:rememberView,
-    chooseDate:date=>{if (isValidDate(date)) {$('#selected-date').value=date;$('#selected-date').dispatchEvent(new Event('change'));}},
+    date:learningDate, today, read:()=>({data,meta:learningMeta,schedule:scheduleMeta}), remember:rememberView,
+    chooseDate:date=>chooseModuleDate('learning',date),
+    restoreDate:date=>{if(isValidDate(date)&&location.hash==='#learning')learningViewDate=date;},
     goal:saveLearningGoal, plan:saveLearningPlan, archive:archiveLearningPlan, focus:focusAction, newRecord:newLearningRecord,
     confirm:confirmAction, toast, open:openUiPage, hasDraft:id=>otherDraftForms.has(id), clearDraft:id=>otherDraftForms.delete(id), markDraft:id=>otherDraftForms.add(id),
   });
@@ -3384,6 +3474,10 @@
   $('#finance-month-confirm').addEventListener('click',()=>closeFinanceMonth(true));
   $('#finance-month-dialog').addEventListener('cancel',event=>{event.preventDefault();closeFinanceMonth(false);});
   window.LifeSocialUI.init({open:openUiPage,remember:rememberView,toast,profile:()=>personalData.profile});
+  routeSectionIds['#health']='health-section';
+  window.LifeHealthUI.init({today,makeId,read:()=>window.LifeHealth.read(localStorage),save:saveHealth,open:openUiPage,remember:rememberView,toast,confirm:confirmAction,refreshHome:renderWorkspaceHome,markDraft:id=>otherDraftForms.add(id),clearDraft:id=>otherDraftForms.delete(id)});
+  routeSectionIds['#notes']='notes-section';
+  window.LifeNotesUI.init({makeId,read:()=>window.LifeNotes.read(localStorage),save:saveNotes,open:openUiPage,back:returnUiPage,remember:rememberView,toast,confirm:confirmAction,refreshHome:renderWorkspaceHome,markDraft:id=>otherDraftForms.add(id),clearDraft:id=>otherDraftForms.delete(id)});
   render();
   renderBillCategories();
   syncNavigation(window.location.hash || '#overview');

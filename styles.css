@@ -350,8 +350,6 @@
   .home-heading { margin-top:var(--space-4); margin-bottom:var(--space-3); }
 
   /* Record entry cards share the home card surface; ordinary data rows stay flat. */
-  #records-section>.section-heading { min-height:0; margin:0; padding:0; border:0; }
-  #records-section>.section-heading>div { height:0; }
   .record-hub-links,.record-secondary-links { display:grid; grid-template-columns:1fr; gap:var(--space-3); }
   .record-hub-links>a,.record-secondary-links>a { min-height:72px; padding:var(--space-3) var(--space-4); border:1px solid var(--border); border-radius:var(--radius-card); background:var(--surface); box-shadow:var(--shadow-card); }
   .record-hub-links>a>span:first-child,.record-secondary-links>a>span:first-child { font-weight:600; }

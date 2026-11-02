@@ -3,11 +3,12 @@
   'use strict';
   const L = root.LifeLearning, $ = selector => document.querySelector(selector);
   const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-  let config, state = { view: 'home', status: 'all', scope: 'selected', period: 'week' }, planExpected = null, busy = false, focusIdentity = '', goalDraftDate = '';
+  let config, dateBrowser, state = { view: 'home', status: 'all', scope: 'selected', period: 'week' }, planExpected = null, busy = false, focusIdentity = '', goalDraftDate = '';
   const label = { running: '专注中 · 后台继续', paused: '已暂停', ended: '待确认保存', saved: '已保存', cancelled: '已取消' };
-  function snapshot() { return { ...state, recordsOpen: $('#learning-records').open }; }
+  function snapshot() { return { ...state, date:config.date(), recordsOpen: $('#learning-records').open }; }
   function restore(value) {
     if (!value || typeof value !== 'object') return;
+    config.restoreDate(value.date);
     if (['home', 'plans', 'focus', 'stats'].includes(value.view)) state.view = value.view;
     if (['all', 'open', 'done'].includes(value.status)) state.status = value.status;
     if (['selected', 'all'].includes(value.scope)) state.scope = value.scope;
@@ -38,9 +39,7 @@
       + '<section id="learning-focus-active" class="hidden"><h3 id="learning-focus-subject"></h3><p id="learning-focus-label" class="subtle-copy"></p><output id="learning-clock" class="learning-clock" aria-label="专注累计时间">00:00:00</output><div id="learning-focus-controls" class="learning-actions"></div><div id="learning-focus-confirm" class="hidden"><label>实际记录日期<input id="learning-focus-date" type="date"></label><p id="learning-focus-minutes" class="subtle-copy"></p><button type="button" class="primary-button" id="learning-focus-save">确认保存学习记录</button></div></section><p id="learning-focus-status" role="status"></p><p class="subtle-copy">计时按时间差计算，刷新或离开后仍保留。结束后确认保存才计入实际时长。</p><div id="learning-focus-last" class="subtle-copy"></div></section>'
       + '<section id="learning-view-stats" role="tabpanel" aria-labelledby="learning-tab-stats"><h3>实际学习</h3><div id="learning-stats-metrics" class="learning-metrics"></div><p id="learning-stats-goal" class="subtle-copy"></p><div class="segmented learning-period"><button type="button" data-learning-period="week">本周</button><button type="button" data-learning-period="month">本月</button></div><p id="learning-trend-range" class="subtle-copy"></p><div id="learning-trend" class="learning-trend" role="img" aria-label="每日实际学习趋势"></div><details class="compose-details"><summary>每日分钟明细</summary><div id="learning-trend-detail"></div></details><p id="learning-stats-plan" class="subtle-copy"></p><div id="learning-stats-recent"></div></section>';
     section.prepend(workspace);
-    $('#learning-date-toolbar').append($('#learning-date-slot'));
-    const todayButton = document.createElement('button'); todayButton.type = 'button'; todayButton.className = 'text-button'; todayButton.textContent = '今天'; todayButton.id = 'learning-today';
-    todayButton.addEventListener('click', () => config.chooseDate(config.today())); $('#learning-date-toolbar').append(todayButton);
+    dateBrowser = root.LifeDateBrowser.mount($('#learning-date-toolbar'), {label:'学习',date:config.date,today:config.today,choose:config.chooseDate});
     const records = document.createElement('details'); records.id = 'learning-records'; records.className = 'compose-details';
     records.innerHTML = '<summary>学习记录与历史</summary>'; section.append(records); records.append(oldHeading, oldGrid);
     oldHeading.querySelector('h2').textContent = '学习记录';
@@ -147,6 +146,7 @@
   }
   function render() {
     if (!config) return;
+    dateBrowser.render();
     const { data, meta, schedule } = config.read(), date = config.date(), isToday = date === config.today();
     document.querySelectorAll('[data-learning-view]').forEach(button => {
       const selected = button.dataset.learningView === state.view; button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;

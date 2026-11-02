@@ -3,7 +3,21 @@
 使用 HTML、CSS 和原生 JavaScript 的个人生活管理网站，金额统一为美元 USD。没有登录、云数据库或第三方账户连接。
 
 
-## 当前版本（2026-10-26）
+## 当前同步基线（2026-11-02）
+
+正式仓库为 `D:/CODEX/Life OS`，旧目录为指向同一目录的链接；GitHub私有仓库 [dabinglei2-hash/-](https://github.com/dabinglei2-hash/-)，分支main。此次同步归档版本 `v0.3.0-sync-2026-11-02`；结果见[同步报告](docs/LIFEOS_GITHUB_SYNC_REPORT.md)和[更新记录](docs/CHANGELOG.md)。
+
+- 当前是原生HTML/CSS/JavaScript，入口仍在根目录，未迁入src，不新增框架或依赖。
+- 五导航为首页、助手、收支、社交、我的；首页8卡，含健康、笔记、习惯及长期目标。助手暂无AI，社交仅会话演示。
+- 完整备份为 **JSON v11**，含健康、独立笔记与妙想图片/草稿；兼容导出v5–v10。Git归档不包含用户浏览器数据，实际个人JSON恢复尚未核实。
+- 启动：`python server/static_server.py --port 8000`。保持原主机名、协议与端口；SW需要正确JS MIME，勿清空存储。
+- 无依赖静态导出：`node scripts/build-pwa.mjs dist-next`（指定尚不存在的目录）；校验：`node scripts/check-pwa.mjs dist-next`。本机/PWA资源存在不代表真机或当前线上验收通过。
+- 可选本机Notion代理存在，真实连接仍待配置验证；邀请认证、AI/记忆/SSE、全站关系数据库均为未来目标，不是已实现能力。
+- Agent/Skills配置纳入Git；独立只读团队流程本轮未验证成功，用户明确批准本次由主控替代审查。后续仍遵守AGENTS.md默认流程。
+
+七份核心文档从[PRD](docs/PRD.md)索引进入；历史记录继续保留于[STATUS](docs/STATUS.md)，当前阶段见[DEVELOPMENT_PROGRESS](docs/DEVELOPMENT_PROGRESS.md)。下方日期章节保留原文，不作为当前能力声明。
+
+## 历史版本快照（2026-10-26）
 
 版本标识：`v0.2.0-backup-2026-10-26`；提交哈希、检查结果及独立恢复步骤见 [版本记录](docs/VERSION_HISTORY.md)。当前功能事实以[产品需求](docs/PRD.md)、[实际架构](docs/ARCHITECTURE.md)、[开发状态](docs/STATUS.md)为准；下方旧日期章节保留历史过程，部分描述已被当前文档取代。
 

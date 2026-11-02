@@ -43,3 +43,18 @@
 - ARCHITECTURE：当前代码如何工作；未来方案必须与现状分开。
 - STATUS：已核实的进度、证据、问题和下一步；区分本次测试、历史测试及未验证描述。
 - 既有 README、报告和备份保留为使用说明/历史证据。有矛盾先核对当前代码并说明，不静默改写历史。
+
+
+## 2026-11-02 Codex 开发团队配置
+
+实际仓库：`D:\CODEX\Life OS`；`D:\CODEX\gerenshenghuoguanliwangzhan` 为指向该目录的链接。复用现有仓库，不创建 LifeOS 副本。CLI 实测版本为 `0.165.0-alpha.1.2`。
+
+配置位于 `.codex/config.toml` 与 `.codex/agents/{scanner,reviewer,builder}.toml`。采用独立文件的 name、description、developer_instructions 和 agents.enabled/max_concurrent_threads_per_session；模型继承会话，不固定模型、不增加业务依赖。
+
+主控流程：记录 Git 基线及未跟踪文件 → Scanner 收集证据 → Reviewer 审查方案 → 重大决定交用户确认 → Builder 按范围实现和测试 → Reviewer 审查实际 Diff → 主控核验并中文交付。只有 Builder 写入，禁止多个写入者同时操作同一工作区。审批必须绑定 HEAD、工作区基线和具体 diff；发生变化重新审查。
+
+统一交接：任务ID、仓库绝对路径、HEAD、工作区基线、目标、允许/禁止文件、用户授权及方案审批、证据路径与行号、发现和严重度、实际测试/未测项、风险、下一角色。主控负责传递完整交接，不把 Reviewer 的技术意见当作用户授权。
+
+权限落实：官方明确子 Agent 继承父会话，Agent TOML 无法覆盖 sandbox_mode/approval_policy。Scanner 和 Reviewer 仅允许从独立只读父会话启动：`codex -C "D:\CODEX\Life OS" --sandbox read-only --ask-for-approval never`，在其中明确调用 scanner 或 reviewer。Builder 使用独立 workspace-write 会话，且与审查阶段串行。不得使用绕过权限参数；禁用可写外部连接器。普通 Git worktree 不是只读隔离。本次当前桌面会话权限为 unrestricted，不能用于声称 Scanner/Reviewer 已获得只读隔离；主控必须先核实新会话有效权限，无法核实时停止派发只读角色。当前仅完成配置落盘，未声称端到端 Agent 调用或 Windows 只读执行实测通过。
+
+本次仅开发流程配置及文档追加，业务、数据库、依赖和密钥不变；未提交、推送、部署。保留原有未提交内容。官方依据：https://learn.chatgpt.com/docs/agent-configuration/subagents 。

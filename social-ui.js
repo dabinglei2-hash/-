@@ -17,7 +17,8 @@
   const likes = new Set(), bookmarks = new Set(), reposts = new Set(), replies = new Map(), replyDrafts = new Map();
   let config, tab = 'recommended', positions = {recommended:0,following:0}, collapsed = false;
   let activeRoute = '', scrollAnchor = 0, frame = 0, holdUntil = 0, sequence = 0;
-  const matches = route => route === '#social' || /^#social\/post\//.test(route || '');
+  let searchQuery = '', searchGeneration = 0;
+  const matches = route => route === '#social' || route === '#social/search' || /^#social\/post\//.test(route || '');
   function findPost(route) {
     let id;
     try { id = decodeURIComponent(route.slice('#social/post/'.length)); }
@@ -48,6 +49,10 @@
   }
   function setCollapsed(value) {
     collapsed = Boolean(value);
+    const hidden = activeRoute === '#social' && collapsed;
+    document.body.classList.toggle('social-nav-hidden',hidden);
+    const nav = $('.mobile-bottom-nav');
+    nav.inert = hidden && matchMedia('(max-width:760px)').matches;
     const header = $('#social-header');
     if (!header) return;
     header.classList.toggle('is-collapsed', collapsed);
@@ -71,9 +76,29 @@
   function feed() {
     const profile = config.profile(), nickname = profile.nickname || '我';
     const selected = tab === 'following' ? posts.filter(post => post.following) : posts;
-    $('#social-section').innerHTML = '<div id="social-feed-view"><header class="social-header" id="social-header"><div class="social-brand"><a class="social-profile" href="#personal" data-open-page aria-label="打开我的个人中心">'+avatar(nickname)+'</a><h2>社交</h2></div><div class="social-tabs" role="tablist" aria-label="演示信息流"><button id="social-tab-recommended" role="tab" aria-controls="social-feed" type="button" data-social-tab="recommended" aria-selected="'+(tab === 'recommended')+'">为你推荐</button><button id="social-tab-following" role="tab" aria-controls="social-feed" type="button" data-social-tab="following" aria-selected="'+(tab === 'following')+'">正在关注</button></div></header><p class="social-demo-notice">本地交互演示 · 合成内容与示例分组，未连接社交服务。发布、回复及互动仅本次页面有效，刷新后清除，不进入生活备份。</p><div id="social-feed" role="tabpanel" aria-labelledby="social-tab-'+tab+'">'+selected.map(card).join('')+'</div><p class="social-end">已显示全部 '+selected.length+' 条演示帖子</p><button class="social-compose-fab" type="button" data-social-compose aria-label="新建演示帖子">'+icon('add')+'</button></div>';
+    $('#social-section').innerHTML = '<div id="social-feed-view"><header class="social-header" id="social-header"><div class="social-brand"><a class="social-profile" href="#personal" data-open-page aria-label="打开我的个人中心">'+avatar(nickname)+'</a><h2>社交</h2><a class="ui-icon-button social-search-open" href="#social/search" data-social-open aria-label="搜索社交内容">'+icon('search')+'</a></div><div class="social-tabs" role="tablist" aria-label="演示信息流"><button id="social-tab-recommended" role="tab" aria-controls="social-feed" type="button" data-social-tab="recommended" aria-selected="'+(tab === 'recommended')+'">为你推荐</button><button id="social-tab-following" role="tab" aria-controls="social-feed" type="button" data-social-tab="following" aria-selected="'+(tab === 'following')+'">正在关注</button></div></header><p class="social-demo-notice">本地交互演示 · 合成内容与示例分组，未连接社交服务。发布、回复及互动仅本次页面有效，刷新后清除，不进入生活备份。</p><div id="social-feed" role="tabpanel" aria-labelledby="social-tab-'+tab+'">'+selected.map(card).join('')+'</div><p class="social-end">已显示全部 '+selected.length+' 条演示帖子</p><button class="social-compose-fab" type="button" data-social-compose aria-label="新建演示帖子">'+icon('add')+'</button></div>';
     setCollapsed(collapsed);
     root.LifeUI.enhance();
+  }
+  function renderSearchResults() {
+    const generation=++searchGeneration,results=$('#social-search-results'),status=$('#social-search-status');
+    const query=searchQuery.trim().toLocaleLowerCase();
+    if(!query){results.innerHTML='';results.removeAttribute('aria-busy');status.textContent='输入正文、作者昵称或用户名。仅搜索本地社交演示，不读取私人记录。';return;}
+    results.setAttribute('aria-busy','true');status.textContent='正在检索本地演示内容…';
+    requestAnimationFrame(()=>{
+      if(generation!==searchGeneration || activeRoute!=='#social/search')return;
+      try {
+        const rows=posts.filter(post=>[post.text,post.name,post.handle].some(value=>value.toLocaleLowerCase().includes(query)));
+        results.innerHTML=rows.map(card).join('');status.textContent=rows.length?'找到 '+rows.length+' 条本地演示帖子':'没有匹配的社交演示内容，可清空后重新搜索。';
+        root.LifeUI.enhance();
+      } catch(error) {
+        results.innerHTML='';status.textContent='本地搜索失败，请清空后重试。';console.error('社交搜索失败',error);
+      } finally {results.removeAttribute('aria-busy');}
+    });
+  }
+  function search() {
+    $('#social-section').innerHTML='<section class="social-search"><label for="social-search-input" class="sr-only">搜索本地社交内容</label><div class="social-search-field"><input id="social-search-input" type="search" maxlength="200" placeholder="搜索社交演示" value="'+esc(searchQuery)+'"><button type="button" class="text-button" data-social-clear>清空</button></div><p id="social-search-status" class="subtle-copy" role="status"></p><div id="social-search-results"></div></section>';
+    renderSearchResults();
   }
   function detail(route) {
     const post = findPost(route);
@@ -88,28 +113,32 @@
   function route(target) {
     const wasFeed = activeRoute === '#social';
     activeRoute = target;
+    if(target !== '#social') {document.body.classList.remove('social-nav-hidden');$('.mobile-bottom-nav').inert=false;}
     resetScrollTracking();
     if ($('#social-compose-dialog').open && !matches(target)) root.LifeUI.closeSheet($('#social-compose-dialog'));
     if (target === '#social') {
       if (!wasFeed) collapsed = false;
       feed();
-    } else if (matches(target)) detail(target);
+    } else if (target === '#social/search') search();
+    else if (matches(target)) detail(target);
   }
   function snapshot() {
-    return {tab,positions:{...positions},collapsed};
+    return {tab,positions:{...positions},collapsed,searchQuery};
   }
   function restore(value) {
     if (!value || typeof value !== 'object') return;
     tab = value.tab === 'following' ? 'following' : 'recommended';
     for (const key of ['recommended','following']) positions[key] = Math.max(0,Number(value.positions?.[key]) || 0);
     collapsed = Boolean(value.collapsed);
+    if(typeof value.searchQuery==='string')searchQuery=value.searchQuery.slice(0,200);
     if (activeRoute === '#social') feed();
+    if (activeRoute === '#social/search') search();
     resetScrollTracking();
   }
   function updatePost(id) {
     const post = posts.find(row=>row.id===id), focused = document.activeElement?.dataset.socialAction;
     if (!post) return;
-    if (activeRoute === '#social') {
+    if (activeRoute === '#social' || activeRoute === '#social/search') {
       const row = [...document.querySelectorAll('.social-post')].find(node=>node.dataset.socialPost===id);
       if (row) row.outerHTML=card(post);
     } else detail(activeRoute);
@@ -146,7 +175,7 @@
       if (y <= 12) {setCollapsed(false); scrollAnchor=y; return;}
       const header = $('#social-header');
       if (!header) return;
-      if (performance.now()<holdUntil || document.querySelector('dialog[open]') || header.querySelector(':focus-visible')) {scrollAnchor=y; return;}
+      if (performance.now()<holdUntil || document.querySelector('dialog[open]') || header.querySelector(':focus-visible') || $('.mobile-bottom-nav').querySelector(':focus-visible')) {scrollAnchor=y; return;}
       // Compare with the current high/low point: tiny steps accumulate, oscillation
       // does not. Clamping ignores Safari's elastic overscroll at either boundary.
       if (collapsed) {
@@ -175,6 +204,8 @@
     });
     dialog.querySelectorAll('[data-social-close]').forEach(button=>button.addEventListener('click',()=>root.LifeUI.closeSheet(dialog)));
     $('#social-section').addEventListener('click',event=>{
+      const clear=event.target.closest('[data-social-clear]');
+      if(clear){searchQuery='';$('#social-search-input').value='';renderSearchResults();config.remember();$('#social-search-input').focus();return;}
       const control=event.target.closest('[data-social-tab],[data-social-open],[data-social-action],[data-social-compose]');
       if (control) {
         if (event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey) return;
@@ -196,7 +227,10 @@
       if(!event.target.matches('[data-social-tab]')||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
       event.preventDefault();const next=event.key==='Home'?'recommended':event.key==='End'?'following':tab==='recommended'?'following':'recommended';$('#social-tab-'+next).click();
     });
-    $('#social-section').addEventListener('input',event=>{if(event.target.id==='social-reply-input')replyDrafts.set(event.target.closest('form').dataset.postId,event.target.value);});
+    $('#social-section').addEventListener('input',event=>{
+      if(event.target.id==='social-search-input'){searchQuery=event.target.value;renderSearchResults();config.remember();}
+      if(event.target.id==='social-reply-input')replyDrafts.set(event.target.closest('form').dataset.postId,event.target.value);
+    });
     $('#social-section').addEventListener('submit',event=>{
       if(event.target.id!=='social-reply-form')return;
       event.preventDefault();const id=event.target.dataset.postId,text=$('#social-reply-input').value.trim();
@@ -212,6 +246,7 @@
       root.LifeUI.closeSheet(dialog,()=>{tab='recommended';collapsed=false;feed();window.scrollTo({top:0,behavior:'instant'});resetScrollTracking();config.remember();config.toast('已添加演示帖子 · 未发布，刷新后清除');});
     });
     window.addEventListener('scroll',scroll,{passive:true});
+    matchMedia('(max-width:760px)').addEventListener('change',()=>{ $('.mobile-bottom-nav').inert=activeRoute==='#social'&&collapsed&&matchMedia('(max-width:760px)').matches; });
     window.addEventListener('pagehide',()=>{if(activeRoute==='#social')config.remember();});
   }
   root.LifeSocialUI = Object.freeze({init,matches,route,snapshot,restore});

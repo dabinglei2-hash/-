@@ -1,3 +1,7 @@
 # Keep bundled editor/OCR resources byte-for-byte consistent with MANIFEST.json.
 # Preserve upstream CRLF and blank EOF lines without treating them as project whitespace errors.
 /vendor/** -text whitespace=cr-at-eol,-blank-at-eof
+
+# Preserve Markdown hard line breaks inside byte-preserved historical snapshots.
+/docs/CODEX_WORK_ENVIRONMENT.md whitespace=-blank-at-eol
+/docs/CODEX_TECH_STACK_AND_TOOLING.md whitespace=-blank-at-eol

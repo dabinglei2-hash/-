@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "Life OS",
+  "short_name": "Life OS",
+  "lang": "zh-CN",
+  "description": "记录生活，专注成长。本地优先的个人生活管理台。",
+  "start_url": "./#overview",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#F7F7F7",
+  "background_color": "#F7F7F7",
+  "icons": [
+    {"src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

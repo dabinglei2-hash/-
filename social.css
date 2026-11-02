@@ -8,6 +8,9 @@
   .social-brand { position:relative; display:flex; align-items:center; min-height:60px; }
   .social-brand h2 { position:absolute; left:50%; transform:translateX(-50%); margin:0; text-align:center; font-size:var(--font-xl); font-weight:600; }
   .social-profile { display:grid; place-items:center; min-width:44px; min-height:44px; }
+  .social-search-open { margin-left:auto; }
+  .social-search-field { display:flex; gap:8px; align-items:center; }
+  .social-search-field input { flex:1; min-width:0; min-height:44px; }
   .social-avatar { flex:0 0 40px; display:inline-grid; place-items:center; width:40px; height:40px; border:1px solid var(--border); border-radius:50%; background:var(--surface-muted); color:var(--text-primary); font-size:var(--font-md); font-weight:600; }
   .social-tabs { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2); }
   .social-tabs button { position:relative; min-height:48px; border:0; padding:var(--space-2); background:transparent; color:var(--text-secondary); font-size:var(--font-md); cursor:pointer; }
@@ -49,12 +52,14 @@
   #social-compose-dialog .form-row button { min-height:44px; white-space:normal; }
   .social-missing { padding-block:var(--space-5); }
   @media(max-width:760px) {
+    body.social-view .mobile-bottom-nav { transition:transform var(--motion-normal) ease,opacity var(--motion-normal) ease; }
+    body.social-view.social-nav-hidden .mobile-bottom-nav { transform:translateY(calc(100% + var(--nav-bottom) + 8px)); opacity:0; pointer-events:none; }
     .social-compose-fab { right:var(--page-gutter); bottom:calc(var(--nav-bottom) + var(--nav-height) + var(--space-3)); }
     .social-post { gap:var(--space-2); }
     .social-header { top:var(--safe-top); }
   }
   @media(prefers-reduced-motion:reduce) {
-    .social-header { transition:none; }
+    .social-header,body.social-view .mobile-bottom-nav { transition:none; }
     .social-action:active,.social-compose-fab:active { transform:none; }
   }
 }

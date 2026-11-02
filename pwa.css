@@ -1,0 +1,13 @@
+@layer components {
+  .pwa-panel { padding:var(--space-3); border:1px solid var(--border); border-radius:var(--radius-card); background:var(--surface); }
+  .pwa-panel .personal-settings-facts { padding:0; border:0; }
+  .pwa-panel dd { overflow-wrap:anywhere; }
+  .pwa-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin:var(--space-3) 0; }
+  .pwa-actions button { min-height:44px; flex:1; }
+  #pwa-guide summary { min-height:44px; display:list-item; align-content:center; cursor:pointer; }
+  #pwa-guide p { color:var(--text-secondary); font-size:var(--font-sm); line-height:1.65; }
+  #pwa-message:empty { display:none; }
+  @media (max-width:760px) and (display-mode:standalone) {
+    .main-content { padding-top:max(var(--space-3),env(safe-area-inset-top,0px)); }
+  }
+}

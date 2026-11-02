@@ -1,0 +1,48 @@
+@layer components {
+  .home-card.home-notes-card { grid-column:1 / -1; min-height:142px; gap:8px; }
+  .home-notes-heading { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .home-notes-heading small { margin-left:auto; font-size:var(--font-xs); color:var(--text-secondary); }
+  #home-notes-title { font-size:var(--font-lg); overflow-wrap:anywhere; }
+  #home-notes-time,#home-notes-count { font-size:var(--font-xs); color:var(--text-secondary); overflow-wrap:anywhere; }
+  #notes-section { max-width:820px; padding-bottom:var(--space-5); }
+  .notes-heading,.notes-tools,.notes-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .notes-heading>div { flex:1; min-width:140px; display:flex; flex-direction:column; gap:5px; }
+  .notes-heading small { color:var(--text-secondary); font-size:var(--font-xs); }
+  .notes-heading a { display:inline-flex; align-items:center; justify-content:center; min-height:44px; }
+  .notes-tools { margin:8px 0 16px; }
+  .notes-tools button,.notes-actions>button { font:inherit; border:1px solid var(--border); border-radius:var(--radius-control); background:var(--surface); color:var(--text-primary); }
+  .notes-tools button:disabled { opacity:.5; cursor:not-allowed; }
+  #notes-section.notes-editing .notes-heading,#notes-section.notes-editing .notes-tools { display:none; }
+  .notes-tools a,.notes-tools button { min-height:44px; display:inline-flex; align-items:center; justify-content:center; flex:1; padding:8px 6px; color:var(--text-primary); }
+  .notes-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .notes-filters label:first-child { grid-column:1 / -1; }
+  .notes-filters label { min-width:0; display:flex; flex-direction:column; gap:5px; }
+  #notes-section input,#notes-section select,#notes-section textarea { width:100%; min-width:0; min-height:44px; }
+  .notes-filters button { grid-column:1 / -1; }
+  .notes-panel,.notes-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-card); box-shadow:var(--shadow-subtle); margin-bottom:12px; }
+  .notes-panel { padding:var(--space-3); }
+  .notes-panel h2 { font-size:var(--font-lg); margin:0 0 12px; overflow-wrap:anywhere; }
+  .notes-card>a { display:block; color:inherit; text-decoration:none; padding:var(--space-3); min-height:84px; border-radius:inherit; }
+  .notes-card p { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; margin:10px 0; color:var(--text-secondary); }
+  .notes-card-heading,.notes-card-meta { display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; justify-content:space-between; }
+  .notes-card-heading strong { overflow-wrap:anywhere; min-width:0; }
+  .notes-card small,.notes-card time { font-size:var(--font-xs); color:var(--text-secondary); }
+  .notes-actions { margin:12px 0; }
+  .notes-actions>* { flex:1; min-width:90px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; white-space:normal; }
+  .notes-body { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.8; padding-block:16px; }
+  #notes-publish-area { border-top:1px solid var(--divider); padding-top:16px; }
+  #notes-publish-area label,#notes-data-view label { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+  #notes-setup-view li { margin-bottom:12px; line-height:1.7; overflow-wrap:anywhere; }
+  #notes-setup-view p { line-height:1.7; }
+  #notes-setup-view code { overflow-wrap:anywhere; white-space:normal; }
+  #notes-body { min-height:160px; max-height:48dvh; resize:vertical; font:inherit; line-height:1.8; }
+  .notes-editor-actions { position:sticky; bottom:0; padding:8px 0; background:var(--surface); }
+  #notes-status:empty { display:none; }
+  .notes-card>a:active { background:var(--surface-secondary); transform:scale(.995); }
+  #notes-section a:focus-visible,#notes-section button:focus-visible { outline:2px solid var(--text-primary); outline-offset:3px; }
+  @media(max-width:760px) {
+    #notes-editor-form:focus-within #notes-body { max-height:min(38dvh,calc(var(--notes-viewport,100dvh) - 230px)); }
+    #notes-editor-form:focus-within .notes-editor-actions { bottom:calc(var(--nav-height,64px) + env(safe-area-inset-bottom)); }
+  }
+  @media(prefers-reduced-motion:reduce) { .notes-card>a:active { transform:none; } }
+}

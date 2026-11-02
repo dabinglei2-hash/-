@@ -4,11 +4,12 @@
   const S = root.LifeSchedule, $ = selector => document.querySelector(selector);
   const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   const icon = name => root.LifeIcons.render(name);
-  let config, state = { view: 'day', month: '', status: 'all', scope: 'selected' }, lastDate = '', repeatExpected = null;
+  let config, dateBrowser, state = { view: 'day', month: '', status: 'all', scope: 'selected' }, lastDate = '', repeatExpected = null;
   const priorityLabel = value => ({ low: '低优先级', medium: '中优先级', high: '高优先级' })[value] || '';
-  function snapshot() { return { ...state }; }
+  function snapshot() { return { ...state, date:config.date() }; }
   function restore(value) {
     if (!value || typeof value !== 'object') return;
+    config.restoreDate(value.date);
     if (['day', 'calendar', 'todo'].includes(value.view)) state.view = value.view;
     if (S.dateValid(value.month + '-01')) state.month = value.month;
     if (['all', 'open', 'done'].includes(value.status)) state.status = value.status;
@@ -19,11 +20,11 @@
     config = options;
     const toolbar = document.createElement('div');
     toolbar.id = 'schedule-toolbar';
-    toolbar.innerHTML = '<div class="schedule-dates"><button type="button" class="ui-icon-button" data-schedule-day="-1" aria-label="查看前一天">' + icon('back') + '</button><div id="schedule-date-slot"></div><button type="button" class="ui-icon-button" data-schedule-day="1" aria-label="查看后一天">' + icon('chevronRight') + '</button><button type="button" class="secondary-button" id="schedule-today">今天</button></div>'
+    toolbar.innerHTML = '<div id="schedule-date-browser"></div>'
       + '<div class="segmented schedule-tabs" role="tablist" aria-label="日程视图"><button type="button" id="schedule-tab-day" role="tab" data-schedule-view="day" aria-controls="schedule-content">今日</button><button type="button" id="schedule-tab-calendar" role="tab" data-schedule-view="calendar" aria-controls="schedule-content">日历</button><button type="button" id="schedule-tab-todo" role="tab" data-schedule-view="todo" aria-controls="schedule-content">待办</button></div>'
       + '<section id="schedule-calendar" class="hidden" aria-label="月历"><div class="schedule-month-heading"><button type="button" class="ui-icon-button" data-schedule-month="-1" aria-label="上个月">' + icon('back') + '</button><h3 id="schedule-month-title"></h3><button type="button" class="ui-icon-button" data-schedule-month="1" aria-label="下个月">' + icon('chevronRight') + '</button></div><div class="schedule-weekdays" aria-hidden="true">' + ['一','二','三','四','五','六','日'].map(day => '<span>' + day + '</span>').join('') + '</div><div id="schedule-month-grid" class="schedule-month-grid" aria-label="选择日程日期"></div></section>';
     $('#task-list-view').prepend(toolbar);
-    $('#schedule-date-slot').append($('#tasks-date-slot'));
+    dateBrowser = root.LifeDateBrowser.mount($('#schedule-date-browser'), {label:'日程',date:config.date,today:config.today,choose:config.chooseDate});
     const content = document.createElement('div'); content.id = 'schedule-content'; content.setAttribute('role', 'tabpanel');
     $('#task-list-view .content-grid').before(content); content.append($('#task-list-view .content-grid'));
     const filters = document.createElement('div'); filters.className = 'schedule-filters';
@@ -72,7 +73,6 @@
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (index + (event.key === 'ArrowLeft' ? 2 : 1)) % 3;
       tabs[next].click(); tabs[next].focus();
     });
-    $('#schedule-today').addEventListener('click', () => config.chooseDate(config.today()));
     $('#schedule-status').addEventListener('change', event => { state.status = event.target.value; refresh(); });
     $('#schedule-scope').addEventListener('change', event => { state.scope = event.target.value; refresh(); });
     $('#schedule-clear').addEventListener('click', () => { state.status = 'all'; state.scope = 'selected'; refresh(); });
@@ -140,6 +140,7 @@
   }
   function render(items, tasks, meta, date) {
     if (!config) return;
+    dateBrowser.render();
     if (lastDate !== date) { state.month = date.slice(0, 7); lastDate = date; }
     if (!state.month) state.month = date.slice(0, 7);
     $('#schedule-tab-day').textContent = date === config.today() ? '今日' : '当日';

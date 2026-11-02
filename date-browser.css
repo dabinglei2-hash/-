@@ -1,0 +1,19 @@
+@layer components {
+  .date-browser { width:100%; min-width:0; margin:0 0 var(--space-3); }
+  .date-browser-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .date-browser-heading>strong { font-size:var(--font-xl); font-weight:600; }
+  .date-browser-heading .text-button { display:flex; align-items:center; gap:4px; min-height:44px; }
+  .date-browser-strip { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; touch-action:pan-y; user-select:none; }
+  .date-browser-strip button { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; min-width:0; min-height:66px; padding:6px 0; border:0; border-radius:var(--radius-card); background:transparent; color:var(--text-secondary); cursor:pointer; }
+  .date-browser-strip small { font-size:var(--font-xs); }
+  .date-browser-strip span { font-size:var(--font-xl); font-variant-numeric:tabular-nums; }
+  .date-browser-strip [aria-pressed=true] { background:var(--surface-muted); color:var(--text-primary); box-shadow:var(--shadow-subtle); }
+  .date-browser-strip .is-today span { text-decoration:underline; text-underline-offset:6px; }
+  .date-browser-strip button:active { background:var(--surface-muted); }
+  .date-browser-actions { display:flex; align-items:center; gap:4px; }
+  .date-browser-actions>[data-date-caption] { flex:1; font-size:var(--font-sm); color:var(--text-secondary); }
+  .date-browser-actions button { min-height:44px; min-width:44px; }
+  #learning-date-toolbar.date-browser { display:block; }
+  .date-browser-dialog input { width:100%; min-height:44px; }
+  .date-browser button:focus-visible { outline:2px solid var(--text-primary); outline-offset:2px; }
+}
